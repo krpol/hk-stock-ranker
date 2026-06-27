@@ -484,15 +484,23 @@ def _apply_filters(df: pd.DataFrame, filter_div_growth: bool, filter_return_grow
             drop_mask = (~exempt) & (~cash_fortress) & cc.notna() & (cc < 0.5)
             out = out[~drop_mask]
     if filter_dividend_coverage:
-        # B25: Dividend Cash Coverage = OCF / (fy_div × shares) ≥ 1.0
+        # B25: Dividend Cash Coverage = real_fcf_3y / cash_div_3y ≥ 1.0
         # 仅对派息股生效，非派息股（dividend_coverage=NaN）保留；金融行业豁免
         # B29/B31: 现金堡垒豁免（统一公司级标记 _cash_fortress）
+        # B32-UI: 增加二重条件 real_fcf / market_cap ≤ 10% 才砍（FCF 收益率 ≤ 10%）
         dcc = pd.to_numeric(out.get("dividend_coverage"), errors="coerce")
         if dcc is not None:
             ind = out.get("industry").astype(str) if "industry" in out.columns else None
             exempt = ind.isin(_FIN_INDUSTRY_EXEMPT) if ind is not None else pd.Series(False, index=out.index)
             cash_fortress = cash_fortress_col.reindex(out.index).fillna(False)
-            drop_mask = (~exempt) & (~cash_fortress) & dcc.notna() & (dcc < 1.0)
+            # real_fcf / market_cap
+            rfcf = pd.to_numeric(out.get("real_fcf"), errors="coerce")
+            cp = pd.to_numeric(out.get("current_price"), errors="coerce")
+            shs = pd.to_numeric(out.get("shares_outstanding"), errors="coerce")
+            mcap = cp * shs
+            fcf_yield = (rfcf / mcap.where(mcap > 0))
+            low_fcf_yield = fcf_yield.fillna(-9.99) <= 0.10  # NaN 视作"低"（保守：缺数据时仍砍）
+            drop_mask = (~exempt) & (~cash_fortress) & dcc.notna() & (dcc < 1.0) & low_fcf_yield
             out = out[~drop_mask]
     if filter_real_fcf_coverage:
         # B31: 剩余可用现金流偿债覆盖率

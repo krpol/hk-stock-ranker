@@ -100,7 +100,7 @@
             <input type="checkbox" name="fcc" value="1" onchange="this.form.submit()" {% if filter_cash_conversion %}checked{% endif %}>
             现金转化率≥0.5
         </label>
-        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="保留 分红现金覆盖率 (3 年平均 OCF / 3 年平均现金分红总额) ≥ 1.0；或 现金堡垒豁免（现金 − 有息负债 − 3×当年总分红 > 市值）；非派息股保留；银行/保险等金融行业豁免">
+        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="砍条件（同时满足才砍）：&#10;  ① 分红现金覆盖率 (3y avg real_fcf / 3y avg 现金分红总额) < 1.0&#10;  ② real_fcf / 市值 ≤ 10%（FCF 收益率不高）&#10;豁免：非派息股 / 金融行业 / 现金堡垒（cash − ibd − 3×div > 市值）">
             <input type="checkbox" name="fdcc" value="1" onchange="this.form.submit()" {% if filter_dividend_coverage %}checked{% endif %}>
             分红现金覆盖≥1
         </label>
