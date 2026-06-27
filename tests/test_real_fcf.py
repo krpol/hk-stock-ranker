@@ -91,15 +91,15 @@ def test_rating_drop_negative_fcf():
 
 
 def test_rating_drop_low_coverage():
-    assert classify_rating(10, 0.04, False) == "DROP"
+    assert classify_rating(10, 0.08, False) == "DROP"
 
 
 def test_rating_warn():
-    assert classify_rating(10, 0.07, False) == "WARN"
+    assert classify_rating(10, 0.12, False) == "WARN"
 
 
 def test_rating_ok():
-    assert classify_rating(10, 0.15, False) == "OK"
+    assert classify_rating(10, 0.20, False) == "OK"
 
 
 def test_rating_strong():
