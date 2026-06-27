@@ -91,15 +91,15 @@ def test_rating_drop_negative_fcf():
 
 
 def test_rating_drop_low_coverage():
-    assert classify_rating(10, 0.08, False) == "DROP"
+    assert classify_rating(10, 0.12, False) == "DROP"
 
 
 def test_rating_warn():
-    assert classify_rating(10, 0.12, False) == "WARN"
+    assert classify_rating(10, 0.17, False) == "WARN"
 
 
 def test_rating_ok():
-    assert classify_rating(10, 0.20, False) == "OK"
+    assert classify_rating(10, 0.25, False) == "OK"
 
 
 def test_rating_strong():
@@ -205,7 +205,7 @@ def test_rating_no_downgrade_when_drop_ratio_none():
 
 def test_rating_downgrade_below_warn():
     # 原 WARN（覆盖率 0.07），drop_ratio < 0.3 → 下调一档 → DROP
-    assert classify_rating(10, 0.07, False, drop_ratio=0.2) == "DROP"
+    assert classify_rating(10, 0.17, False, drop_ratio=0.2) == "DROP"
 
 
 def test_evaluate_with_ttm_drop():

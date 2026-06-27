@@ -312,6 +312,51 @@ def _attach_cashflow_factors(df: pd.DataFrame) -> pd.DataFrame:
     # 单位：亿（用于展示）
     out["real_fcf_yi"] = pd.to_numeric(out["real_fcf"], errors="coerce") / 1e8
 
+    # B32-UI v5: 剩余 FCF / TTM 分红 zscore，加入 composite_score (权重 0.1)
+    # 分母用 max(TTM 分红总额, 市值 × 5%)，避免低分红股比率爆掉
+    # 现金堡垒豁免：直接给 z=最大值（最高加分）；负 FCF → 负值（被惩罚）
+    rfcf_for_z = pd.to_numeric(out["real_fcf"], errors="coerce")
+    fy_div_ps_z = pd.to_numeric(out.get("fy_div_per_share"), errors="coerce").fillna(0)
+    shs_z = pd.to_numeric(out.get("shares_outstanding"), errors="coerce").fillna(0)
+    cp_z = pd.to_numeric(out.get("current_price"), errors="coerce")
+    mcap_z = cp_z * shs_z
+    ttm_div_total = fy_div_ps_z * shs_z
+    div_floor = mcap_z * 0.05  # 市值 5% 作为分母底
+    denom_z = pd.concat([ttm_div_total, div_floor], axis=1).max(axis=1)
+    fcf_div_ratio = rfcf_for_z / denom_z.where(denom_z > 0)
+    out["fcf_div_ratio"] = fcf_div_ratio.round(4)
+
+    # 计算 winsorized zscore
+    def _wz(series):
+        s = pd.to_numeric(series, errors="coerce")
+        valid = s.dropna()
+        if len(valid) < 10:
+            return pd.Series([float("nan")] * len(s), index=s.index)
+        lo, hi = valid.quantile(0.01), valid.quantile(0.99)
+        sw = s.clip(lower=lo, upper=hi)
+        mu = sw.mean(skipna=True)
+        sd = sw.std(skipna=True, ddof=0)
+        if not sd or sd < 1e-9:
+            return pd.Series([float("nan")] * len(s), index=s.index)
+        return ((sw - mu) / sd).round(4)
+
+    fcf_div_z = _wz(fcf_div_ratio)
+    # 现金堡垒豁免：给 z = 当前最大值（不再被分红口径拖累）
+    if "_cash_fortress" in out.columns:
+        cf_mask = out["_cash_fortress"].fillna(False).astype(bool)
+        max_z = fcf_div_z.max(skipna=True)
+        if pd.notna(max_z):
+            fcf_div_z = fcf_div_z.where(~cf_mask, max_z)
+    out["fcf_div_zscore"] = fcf_div_z.fillna(0.0)
+
+    # 重算 composite_score = return_z×1.0 + growth×0.2 + cash_buffer_z×0.2 + fcf_div_z×0.1
+    rz = pd.to_numeric(out.get("return_zscore"), errors="coerce")
+    gz = pd.to_numeric(out.get("growth_factor"), errors="coerce").fillna(0.0)
+    cbz = pd.to_numeric(out.get("cash_buffer_zscore"), errors="coerce").fillna(0.0)
+    fdz = pd.to_numeric(out["fcf_div_zscore"], errors="coerce").fillna(0.0)
+    out["composite_score"] = (rz * 1.0 + gz * 0.2 + cbz * 0.2 + fdz * 0.1).round(4)
+
+
     # 清理 merge 残留 + 内部辅助列
     out = out.drop(columns=[
         "ttm_operating_cashflow", "prev_ttm_operating_cashflow", "ttm_operating_cashflow_t2",
@@ -640,7 +685,13 @@ def index():
             df = df.sort_values(
                 ["return_rate"], ascending=[False], na_position="last", kind="mergesort",
             )
-        # composite: 保持 CSV 中既有顺序（已按 composite_score 排好）
+        else:
+            # composite: 按重算后的 composite_score 重排
+            if "composite_score" in df.columns:
+                df = df.sort_values(
+                    ["composite_score", "return_rate"],
+                    ascending=[False, False], na_position="last", kind="mergesort",
+                )
         # 重算 rank（与当前可见顺序对齐）
         if "rank" in df.columns:
             df = df.reset_index(drop=True)
@@ -749,6 +800,13 @@ def api_ranking():
     cash_fortress_exempt = "1" in _fcfx_vals if _fcfx_vals else True
     fcf_rating_keep = request.args.getlist("frating")
     df = _apply_filters(df, filter_div_growth, filter_return_growth, filter_real_buyback, filter_revenue, filter_price_3y_low_3x, filter_price_6m_low_18x, filter_price_2m_low_13x, filter_ocf, filter_momentum, filter_net_debt_hard, filter_net_debt_z, filter_growth_factor, filter_roe_z, filter_turnover_z, filter_cash_conversion, filter_dividend_coverage, filter_real_fcf_coverage, cash_fortress_exempt=cash_fortress_exempt, fcf_rating_keep=fcf_rating_keep or None)
+    # 按重算后的 composite_score 重排，并重写 rank
+    if not df.empty and "composite_score" in df.columns:
+        df = df.sort_values(
+            ["composite_score", "return_rate"],
+            ascending=[False, False], na_position="last", kind="mergesort",
+        ).reset_index(drop=True)
+        df["rank"] = df.index + 1
     return jsonify({
         "period": period,
         "total": len(df),

@@ -28,9 +28,9 @@ from typing import Optional
 
 EPS_RATIO = 0.01        # 1% × Equity
 EPS_FLOOR = 1e8         # 1 亿港币
-THRESHOLD_DROP = 0.10
-THRESHOLD_WARN = 0.15
-THRESHOLD_OK = 0.25
+THRESHOLD_DROP = 0.15
+THRESHOLD_WARN = 0.20
+THRESHOLD_OK = 0.30
 
 # B32: 突降阈值
 DROP_RATIO_WARN = 0.30   # 当年 < 30% 3y 平均 → 下调一档

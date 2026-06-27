@@ -104,16 +104,16 @@
             <input type="checkbox" name="fdcc" value="1" onchange="this.form.submit()" {% if filter_dividend_coverage %}checked{% endif %}>
             分红现金覆盖≥1
         </label>
-        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="B31: 剩余可用现金流偿债覆盖率 ≥ 10%&#10;  剩余 CF = 3y平均OCF − min(3y平均CapEx + 期初一年内到期租赁, 3y平均D&A)&#10;  ε = max(净资产 × 1%, 1亿)&#10;  覆盖率 = 剩余CF / max(IBD−Cash, ε)&#10;  剔除 fcf_rating==DROP (real_fcf<0 或 覆盖率<10%)&#10;  现金堡垒（cash − ibd > 市值）自动豁免，评级 AAA;&#10;  评级为 N/A 的（数据缺失）保留">
+        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="B31: 剩余可用现金流偿债覆盖率 ≥ 15%&#10;  剩余 CF = 3y平均OCF − min(3y平均CapEx + 期初一年内到期租赁, 3y平均D&A)&#10;  ε = max(净资产 × 1%, 1亿)&#10;  覆盖率 = 剩余CF / max(IBD−Cash, ε)&#10;  剔除 fcf_rating==DROP (real_fcf<0 或 覆盖率<15%)&#10;  现金堡垒（cash − ibd > 市值）自动豁免，评级 AAA;&#10;  评级为 N/A 的（数据缺失）保留">
             <input type="checkbox" name="frfc" value="1" onchange="this.form.submit()" {% if filter_real_fcf_coverage %}checked{% endif %}>
-            剩余CF/净债≥10%
+            剩余CF/净债≥15%
         </label>
         <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="勾选时：现金堡垒公司（cash − ibd > 市值）在 CC/DCC/Net D/E硬阈值/frfc 4 个过滤器中豁免（默认行为）。&#10;取消时：关闭豁免，所有公司一视同仁按硬规则砍。">
             <input type="hidden" name="fcfx" value="0">
             <input type="checkbox" name="fcfx" value="1" onchange="this.form.submit()" {% if cash_fortress_exempt %}checked{% endif %}>
             现金堡垒豁免
         </label>
-        <span style="font-size:0.88rem;display:flex;align-items:center;gap:5px;" title="FCF 评级多选（不勾任何 = 不限）。&#10;STRONG: real_fcf>0 且覆盖率≥25%&#10;OK: real_fcf>0 且覆盖率 15-25%&#10;WARN: real_fcf>0 且覆盖率 10-15%&#10;DROP: real_fcf<0 或覆盖率<10%&#10;AAA: 现金堡垒（自动）&#10;N/A: 数据缺失">
+        <span style="font-size:0.88rem;display:flex;align-items:center;gap:5px;" title="FCF 评级多选（不勾任何 = 不限）。&#10;STRONG: real_fcf>0 且覆盖率≥30%&#10;OK: real_fcf>0 且覆盖率 20-30%&#10;WARN: real_fcf>0 且覆盖率 15-20%&#10;DROP: real_fcf<0 或覆盖率<15%&#10;AAA: 现金堡垒（自动）&#10;N/A: 数据缺失">
             评级:
             {% for r in ["STRONG","OK","WARN","DROP","AAA","N/A"] %}
             <label style="display:flex;align-items:center;gap:2px;cursor:pointer;">
