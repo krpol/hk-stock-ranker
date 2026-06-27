@@ -56,11 +56,11 @@
             <option value="{{ p }}" {% if p == selected_period %}selected{% endif %}>{{ p }}</option>
             {% endfor %}
         </select>
-        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="保留 TTM分红 ≥ 上年TTM分红 或 最近期分红 ≥ 同期上年分红（任一不降即保留；两项都下降才剔除）">
+        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="保留 TTM分红 ≥ 上年TTM分红 或 最近期分红 ≥ 同期上年分红（任一不降即保留）&#10;救生条件：最新 fy_div_per_share / current_price ≥ 15% 仍保留">
             <input type="checkbox" name="fdg" value="1" onchange="this.form.submit()" {% if filter_div_growth %}checked{% endif %}>
             分红同比不下降
         </label>
-        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="剩 TTM回报 ≥ 上年TTM回报">
+        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="剩 TTM回报 ≥ 上年TTM回报&#10;救生条件：最新 return_rate ≥ 15% 仍保留">
             <input type="checkbox" name="frg" value="1" onchange="this.form.submit()" {% if filter_return_growth %}checked{% endif %}>
             回报同比不下降
         </label>

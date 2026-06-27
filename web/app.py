@@ -394,17 +394,33 @@ def _apply_filters(df: pd.DataFrame, filter_div_growth: bool, filter_return_grow
         # OR 逻辑：只要 TTM 或 最近期 任一不下降就保留；只有两项都下降才剔除
         ttm_ok = (a.fillna(0) >= b.fillna(0)) if (a is not None and b is not None) else None
         latest_ok = (c.fillna(0) >= d.fillna(0)) if (c is not None and d is not None) else None
+        # B32-UI: 高股息率救生 - 最新分红/市值 >= 15% 仍保留
+        cp = pd.to_numeric(out.get("current_price"), errors="coerce")
+        div_yield_ok = None
+        if a is not None and cp is not None:
+            div_yield_ok = (pd.to_numeric(a, errors="coerce") / cp.where(cp > 0)) >= 0.15
+            div_yield_ok = div_yield_ok.fillna(False)
         if ttm_ok is not None and latest_ok is not None:
-            out = out[ttm_ok | latest_ok]
+            keep = ttm_ok | latest_ok
+            if div_yield_ok is not None:
+                keep = keep | div_yield_ok
+            out = out[keep]
         elif ttm_ok is not None:
-            out = out[ttm_ok]
+            keep = ttm_ok | (div_yield_ok if div_yield_ok is not None else False)
+            out = out[keep]
         elif latest_ok is not None:
-            out = out[latest_ok]
+            keep = latest_ok | (div_yield_ok if div_yield_ok is not None else False)
+            out = out[keep]
     if filter_return_growth:
         e = out.get("ttm_return_rate")
         f = out.get("prev_ttm_return_rate")
         if e is not None and f is not None:
-            out = out[e.fillna(0) >= f.fillna(0)]
+            keep = e.fillna(0) >= f.fillna(0)
+            # B32-UI: 高回报率救生 - 最新回报/市值 >= 15% 仍保留 (return_rate 已是 % 单位)
+            rr = pd.to_numeric(out.get("return_rate"), errors="coerce")
+            if rr is not None:
+                keep = keep | (rr >= 15).fillna(False)
+            out = out[keep]
     if filter_real_buyback:
         # 只保留股本净变化 >= 0（未被稀释）的股票
         nsc = out.get("net_share_change_rate")
