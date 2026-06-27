@@ -484,11 +484,12 @@ def _apply_filters(df: pd.DataFrame, filter_div_growth: bool, filter_return_grow
             drop_mask = (~exempt) & (~cash_fortress) & cc.notna() & (cc < 0.5)
             out = out[~drop_mask]
     if filter_dividend_coverage:
-        # B25 → B32-UI v2: 分红现金覆盖过滤
-        # 砍条件（同时满足）：
+        # B25 → B32-UI v4: 分红现金覆盖过滤
+        # 砍条件（同时满足才砍）：
         #   ① real_fcf / market_cap ≤ 8%（FCF 收益率不高）
-        #   ② real_fcf_ttm / (当年分红/股 × 总股本) < 1.0（当年 TTM FCF 不够覆盖当年分红）
-        # 仅对派息股生效；金融行业豁免；现金堡垒豁免
+        #   ② 3y avg real_fcf / 3y avg 现金分红 < 1.0（长周期口径不足）
+        #   ③ real_fcf_ttm / 当年现金分红 < 1.0（当年 TTM 口径不足）
+        # 三者只要任一不满足就保留；豁免：非派息股 / 金融行业 / 现金堡垒
         ind = out.get("industry").astype(str) if "industry" in out.columns else None
         exempt = ind.isin(_FIN_INDUSTRY_EXEMPT) if ind is not None else pd.Series(False, index=out.index)
         cash_fortress = cash_fortress_col.reindex(out.index).fillna(False)
@@ -499,12 +500,15 @@ def _apply_filters(df: pd.DataFrame, filter_div_growth: bool, filter_return_grow
         fyd_ps = pd.to_numeric(out.get("fy_div_per_share"), errors="coerce")
         mcap = cp * shs
         annual_div_total = fyd_ps * shs
-        # 条件①：FCF 收益率 ≤ 8%（NaN 视作"低"，按砍方向；保守口径）
+        # ①
         cond_low_yield = (rfcf / mcap.where(mcap > 0)).fillna(-9.99) <= 0.08
-        # 条件②：当年 TTM coverage < 1（仅对派息股 annual_div_total > 0 生效；非派息保留）
+        # ② 3y avg DCC < 1（dividend_coverage 已是 3y 口径）
+        dcc_3y = pd.to_numeric(out.get("dividend_coverage"), errors="coerce")
+        cond_3y_under = dcc_3y.notna() & (dcc_3y < 1.0)
+        # ③ TTM coverage < 1
         ttm_cover = rfcf_ttm / annual_div_total.where(annual_div_total > 0)
         cond_ttm_under = ttm_cover.notna() & (ttm_cover < 1.0)
-        drop_mask = (~exempt) & (~cash_fortress) & cond_low_yield & cond_ttm_under
+        drop_mask = (~exempt) & (~cash_fortress) & cond_low_yield & cond_3y_under & cond_ttm_under
         out = out[~drop_mask]
     if filter_real_fcf_coverage:
         # B31: 剩余可用现金流偿债覆盖率
