@@ -251,15 +251,14 @@ def _attach_cashflow_factors(df: pd.DataFrame) -> pd.DataFrame:
     lease_ttm_s = pd.to_numeric(out.get("current_lease_obligation_ttm"), errors="coerce")
 
     # B31: 公司级 cash_fortress 标记（跨过滤器超级豁免）
+    # B32-UI v2: 简化为净现金缓冲 (cash − ibd) > 市值，不再扣 3 年分红
     cp = pd.to_numeric(out.get("current_price"), errors="coerce")
     shs = pd.to_numeric(out.get("shares_outstanding"), errors="coerce")
-    fyd_ps = pd.to_numeric(out.get("fy_div_per_share"), errors="coerce")
     mcap = cp * shs
-    annual_div_total = (fyd_ps.fillna(0) * shs.fillna(0))
-    net_cash_after_3y = cash_s.fillna(0) - ibd_s.fillna(0) - 3.0 * annual_div_total
+    net_cash = cash_s.fillna(0) - ibd_s.fillna(0)
     out["_cash_fortress"] = (
         cash_s.notna() & ibd_s.notna() & mcap.notna() & (mcap > 0)
-        & (net_cash_after_3y > mcap)
+        & (net_cash > mcap)
     ).fillna(False)
 
     real_fcf_vals = []
