@@ -34,7 +34,8 @@ HK_STOCK_FILTERS = {
     "max_total_liability_ratio": 0.80,
     # B19: 最大有息负债/净资产（None 表示不限）；超过此阈值的股票将被过滤
     # 有息负债/净资产 = (短期借款 + 长期借款) / 股东权益
-    "max_debt_to_equity": 1.00,
+    # B32-UI: 已禁用，与 web 层 fndz (zscore) 过滤重复
+    "max_debt_to_equity": None,
 }
 
 # B9: 流动性窗口复核
