@@ -594,15 +594,14 @@ def _apply_filters(df: pd.DataFrame, filter_div_growth: bool, filter_return_grow
             drop_mask = (~exempt) & (~cash_fortress) & cc.notna() & (cc < 0.5)
             out = out[~drop_mask]
     if filter_dividend_coverage:
-        # B25 → B32-UI v4: 分红现金覆盖过滤
+        # B25 → B32-UI v9: 分红现金覆盖过滤
         # 砍条件（同时满足才砍）：
         #   ① real_fcf / market_cap ≤ 8%（FCF 收益率不高）
         #   ② 3y avg real_fcf / 3y avg 现金分红 < 1.0（长周期口径不足）
         #   ③ real_fcf_ttm / 当年现金分红 < 1.0（当年 TTM 口径不足）
-        # 三者只要任一不满足就保留；豁免：非派息股 / 金融行业 / 现金堡垒
+        # 豁免：非派息股 / 金融行业 / 可分配覆盖（3y avg real_fcf + 0.1×净现金 > 3y avg 分红总额）
         ind = out.get("industry").astype(str) if "industry" in out.columns else None
         exempt = ind.isin(_FIN_INDUSTRY_EXEMPT) if ind is not None else pd.Series(False, index=out.index)
-        cash_fortress = cash_fortress_col.reindex(out.index).fillna(False)
         rfcf = pd.to_numeric(out.get("real_fcf"), errors="coerce")
         rfcf_ttm = pd.to_numeric(out.get("real_fcf_ttm"), errors="coerce")
         cp = pd.to_numeric(out.get("current_price"), errors="coerce")
@@ -618,7 +617,17 @@ def _apply_filters(df: pd.DataFrame, filter_div_growth: bool, filter_return_grow
         # ③ TTM coverage < 1
         ttm_cover = rfcf_ttm / annual_div_total.where(annual_div_total > 0)
         cond_ttm_under = ttm_cover.notna() & (ttm_cover < 1.0)
-        drop_mask = (~exempt) & (~cash_fortress) & cond_low_yield & cond_3y_under & cond_ttm_under
+        # 豁免：可分配总额（3y real_fcf + 0.1×净现金）盖得住 3y 平均分红
+        ibd = pd.to_numeric(out.get("interest_bearing_debt"), errors="coerce")
+        cash = pd.to_numeric(out.get("cash_and_equivalents"), errors="coerce")
+        net_cash_abs = cash.fillna(0) - ibd.fillna(0)
+        dist_total = rfcf.fillna(0) + 0.1 * net_cash_abs
+        prev_div_ps = pd.to_numeric(out["prev_year_div_per_share"], errors="coerce") if "prev_year_div_per_share" in out.columns else pd.Series(0.0, index=out.index)
+        two_ago_div_ps = pd.to_numeric(out["two_years_ago_div_per_share"], errors="coerce") if "two_years_ago_div_per_share" in out.columns else pd.Series(0.0, index=out.index)
+        div_3y_avg_ps = (fyd_ps.fillna(0) + prev_div_ps.fillna(0) + two_ago_div_ps.fillna(0)) / 3.0
+        div_3y_total = div_3y_avg_ps * shs.fillna(0)
+        dist_exempt = ((div_3y_total > 0) & (dist_total > div_3y_total)).fillna(False)
+        drop_mask = (~exempt) & (~dist_exempt) & cond_low_yield & cond_3y_under & cond_ttm_under
         out = out[~drop_mask]
     # B32-UI v5: frfc 已废弃（与 FCF 评级多选语义重复），通过 fcf_rating_keep 实现
     # B32-UI: FCF 评级多选过滤（仅保留勾选的评级）
