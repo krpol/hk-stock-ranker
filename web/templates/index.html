@@ -21,6 +21,13 @@
         table { width: 100%; border-collapse: separate; border-spacing: 0; background: white; box-shadow: 0 1px 4px rgba(0,0,0,0.08); font-size: 0.88rem; }
         thead { background: #1a2744; color: white; }
         thead th { padding: 11px 12px; text-align: left; font-weight: 500; white-space: nowrap; position: sticky; top: 0; background: #1a2744; z-index: 10; box-shadow: 0 2px 0 rgba(0,0,0,0.15); }
+        /* 左两列冻结 */
+        tbody td:nth-child(1), tbody td:nth-child(2) { position: sticky; background: white; z-index: 5; }
+        tbody tr:nth-child(even) td:nth-child(1), tbody tr:nth-child(even) td:nth-child(2) { background: #f8f9fc; }
+        tbody tr:hover td:nth-child(1), tbody tr:hover td:nth-child(2) { background: #eef2ff; }
+        thead th:nth-child(1), thead th:nth-child(2) { z-index: 11; }
+        thead th:nth-child(1), tbody td:nth-child(1) { left: 0; min-width: 56px; }
+        thead th:nth-child(2), tbody td:nth-child(2) { left: 56px; min-width: 78px; box-shadow: 2px 0 4px rgba(0,0,0,0.08); }
         tbody tr:nth-child(even) { background: #f8f9fc; }
         tbody tr:hover { background: #eef2ff; }
         tbody td { padding: 9px 12px; white-space: nowrap; border-bottom: 1px solid #f0f2f6; }
