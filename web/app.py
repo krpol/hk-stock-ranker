@@ -312,19 +312,14 @@ def _attach_cashflow_factors(df: pd.DataFrame) -> pd.DataFrame:
     # 单位：亿（用于展示）
     out["real_fcf_yi"] = pd.to_numeric(out["real_fcf"], errors="coerce") / 1e8
 
-    # B32-UI v5: 剩余 FCF / TTM 分红 zscore，加入 composite_score (权重 0.1)
-    # 分母用 max(TTM 分红总额, 市值 × 5%)，避免低分红股比率爆掉
-    # 现金堡垒豁免：直接给 z=最大值（最高加分）；负 FCF → 负值（被惩罚）
+    # B32-UI v6: 综合得分三因子全部统一口径
+    #   1) sustainable_return_zscore: 用 sustainable_return_rate（已含 real_fcf cap）替代 return_rate
+    #   2) cash_buffer_zscore_v2: (cash − ibd) / mcap，去掉 3×div 扣减，与 cash_fortress 口径统一
+    #   3) fcf_yield_zscore: real_fcf / mcap（FCF yield），替代原 fcf_div_zscore
     rfcf_for_z = pd.to_numeric(out["real_fcf"], errors="coerce")
-    fy_div_ps_z = pd.to_numeric(out.get("fy_div_per_share"), errors="coerce").fillna(0)
-    shs_z = pd.to_numeric(out.get("shares_outstanding"), errors="coerce").fillna(0)
     cp_z = pd.to_numeric(out.get("current_price"), errors="coerce")
+    shs_z = pd.to_numeric(out.get("shares_outstanding"), errors="coerce").fillna(0)
     mcap_z = cp_z * shs_z
-    ttm_div_total = fy_div_ps_z * shs_z
-    div_floor = mcap_z * 0.05  # 市值 5% 作为分母底
-    denom_z = pd.concat([ttm_div_total, div_floor], axis=1).max(axis=1)
-    fcf_div_ratio = rfcf_for_z / denom_z.where(denom_z > 0)
-    out["fcf_div_ratio"] = fcf_div_ratio.round(4)
 
     # 计算 winsorized zscore
     def _wz(series):
@@ -340,21 +335,43 @@ def _attach_cashflow_factors(df: pd.DataFrame) -> pd.DataFrame:
             return pd.Series([float("nan")] * len(s), index=s.index)
         return ((sw - mu) / sd).round(4)
 
-    fcf_div_z = _wz(fcf_div_ratio)
-    # 现金堡垒豁免：给 z = 当前最大值（不再被分红口径拖累）
+    # ---- (1) sustainable_return_zscore ----
+    sust_rate = pd.to_numeric(out.get("sustainable_return_rate"), errors="coerce")
+    sust_z = _wz(sust_rate)
+    out["sustainable_return_zscore"] = sust_z
+
+    # ---- (2) cash_buffer_zscore_v2 (无 3×div) ----
+    cash_z = pd.to_numeric(out.get("cash_and_equivalents"), errors="coerce")
+    ibd_z = pd.to_numeric(out.get("interest_bearing_debt"), errors="coerce")
+    net_cash_z = cash_z.fillna(0) - ibd_z.fillna(0)
+    cb_ratio_v2 = net_cash_z / mcap_z.where(mcap_z > 0)
+    out["cash_buffer_ratio_v2"] = cb_ratio_v2.round(4)
+    cbz_v2 = _wz(cb_ratio_v2)
+    out["cash_buffer_zscore_v2"] = cbz_v2.fillna(0.0)
+
+    # ---- (3) fcf_yield_zscore = real_fcf / mcap ----
+    fcf_yield = rfcf_for_z / mcap_z.where(mcap_z > 0)
+    out["fcf_yield"] = fcf_yield.round(4)
+    fy_z = _wz(fcf_yield)
+    # 现金堡垒豁免：给 z = 当前最大值（不被低 FCF 拖累）
     if "_cash_fortress" in out.columns:
         cf_mask = out["_cash_fortress"].fillna(False).astype(bool)
-        max_z = fcf_div_z.max(skipna=True)
+        max_z = fy_z.max(skipna=True)
         if pd.notna(max_z):
-            fcf_div_z = fcf_div_z.where(~cf_mask, max_z)
-    out["fcf_div_zscore"] = fcf_div_z.fillna(0.0)
+            fy_z = fy_z.where(~cf_mask, max_z)
+    out["fcf_yield_zscore"] = fy_z.fillna(0.0)
 
-    # 重算 composite_score = return_z×1.0 + growth×0.2 + cash_buffer_z×0.2 + fcf_div_z×0.1
-    rz = pd.to_numeric(out.get("return_zscore"), errors="coerce")
+    # 旧字段为兼容保留（同时填入新口径，便于展示老列名时不破坏）
+    out["fcf_div_ratio"] = fcf_yield.round(4)
+    out["fcf_div_zscore"] = out["fcf_yield_zscore"]
+
+    # 重算 composite_score
+    #   sust_z × 1.0 + growth × 0.2 + cash_buffer_z_v2 × 0.2 + fcf_yield_z × 0.1
+    srz = pd.to_numeric(sust_z, errors="coerce").fillna(0.0)
     gz = pd.to_numeric(out.get("growth_factor"), errors="coerce").fillna(0.0)
-    cbz = pd.to_numeric(out.get("cash_buffer_zscore"), errors="coerce").fillna(0.0)
-    fdz = pd.to_numeric(out["fcf_div_zscore"], errors="coerce").fillna(0.0)
-    out["composite_score"] = (rz * 1.0 + gz * 0.2 + cbz * 0.2 + fdz * 0.1).round(4)
+    cbz2 = pd.to_numeric(out["cash_buffer_zscore_v2"], errors="coerce").fillna(0.0)
+    fyz = pd.to_numeric(out["fcf_yield_zscore"], errors="coerce").fillna(0.0)
+    out["composite_score"] = (srz * 1.0 + gz * 0.2 + cbz2 * 0.2 + fyz * 0.1).round(4)
 
 
     # 清理 merge 残留 + 内部辅助列
