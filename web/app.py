@@ -470,11 +470,14 @@ def _apply_filters(df: pd.DataFrame, filter_div_growth: bool, filter_return_grow
         # OR 逻辑：只要 TTM 或 最近期 任一不下降就保留；只有两项都下降才剔除
         ttm_ok = (a.fillna(0) >= b.fillna(0)) if (a is not None and b is not None) else None
         latest_ok = (c.fillna(0) >= d.fillna(0)) if (c is not None and d is not None) else None
-        # B32-UI: 高股息率救生 - 最新分红/市值 >= 15% 仍保留
+        # B32-UI: 高股息率救生 - (2*fy_div - prev_year_div) / price >= 15% 仍保留
+        # 公式含义：用"今年隐含分红 - 上年分红"近似前瞻派息能力，避免单期高基数误救
         cp = pd.to_numeric(out.get("current_price"), errors="coerce")
         div_yield_ok = None
-        if a is not None and cp is not None:
-            div_yield_ok = (pd.to_numeric(a, errors="coerce") / cp.where(cp > 0)) >= 0.15
+        if a is not None and b is not None and cp is not None:
+            an = pd.to_numeric(a, errors="coerce")
+            bn = pd.to_numeric(b, errors="coerce")
+            div_yield_ok = ((2 * an - bn) / cp.where(cp > 0)) >= 0.15
             div_yield_ok = div_yield_ok.fillna(False)
         if ttm_ok is not None and latest_ok is not None:
             keep = ttm_ok | latest_ok
@@ -584,14 +587,16 @@ def _apply_filters(df: pd.DataFrame, filter_div_growth: bool, filter_return_grow
     if filter_cash_conversion:
         # B25: Cash Conversion = OCF / OpInc ≥ 0.5
         # 金融行业（OCF 含存贷款变动）豁免：industry 在 _FIN_INDUSTRY_EXEMPT 中视为 NaN 保留
-        # B32: 现金堡垒豁免（与 DCC / DE / frfc 同一豁免）
+        # B32-UI v9: 现金堡垒豁免需同时 OCF_3y_avg > 0
         cc = pd.to_numeric(out.get("cash_conversion"), errors="coerce")
         if cc is not None:
             ind = out.get("industry").astype(str) if "industry" in out.columns else None
             exempt = ind.isin(_FIN_INDUSTRY_EXEMPT) if ind is not None else pd.Series(False, index=out.index)
             cash_fortress = cash_fortress_col.reindex(out.index).fillna(False)
-            # 剔除：非豁免 + 非堡垒 + 非NaN + cc<0.5
-            drop_mask = (~exempt) & (~cash_fortress) & cc.notna() & (cc < 0.5)
+            ocf_3y_pos = pd.to_numeric(out.get("ocf_3y_avg"), errors="coerce").fillna(0) > 0
+            cf_exempt = cash_fortress & ocf_3y_pos
+            # 剔除：非金融 + 非(堡垒且OCF>0) + 非NaN + cc<0.5
+            drop_mask = (~exempt) & (~cf_exempt) & cc.notna() & (cc < 0.5)
             out = out[~drop_mask]
     if filter_dividend_coverage:
         # B25 → B32-UI v9: 分红现金覆盖过滤
@@ -617,7 +622,7 @@ def _apply_filters(df: pd.DataFrame, filter_div_growth: bool, filter_return_grow
         # ③ TTM coverage < 1
         ttm_cover = rfcf_ttm / annual_div_total.where(annual_div_total > 0)
         cond_ttm_under = ttm_cover.notna() & (ttm_cover < 1.0)
-        # 豁免：现金堡垒 且 可分配总额（3y real_fcf + 0.1×净现金）盖得住 3y 平均分红
+        # 豁免：现金堡垒 且 可分配总额（3y real_fcf + 0.1×净现金）盖得住 3y 平均分红 且 real_fcf > 0
         cash_fortress = cash_fortress_col.reindex(out.index).fillna(False)
         ibd = pd.to_numeric(out.get("interest_bearing_debt"), errors="coerce")
         cash = pd.to_numeric(out.get("cash_and_equivalents"), errors="coerce")
@@ -628,7 +633,8 @@ def _apply_filters(df: pd.DataFrame, filter_div_growth: bool, filter_return_grow
         div_3y_avg_ps = (fyd_ps.fillna(0) + prev_div_ps.fillna(0) + two_ago_div_ps.fillna(0)) / 3.0
         div_3y_total = div_3y_avg_ps * shs.fillna(0)
         dist_cover = ((div_3y_total > 0) & (dist_total > div_3y_total)).fillna(False)
-        cf_exempt = cash_fortress & dist_cover
+        rfcf_pos = rfcf.fillna(-1) > 0
+        cf_exempt = cash_fortress & dist_cover & rfcf_pos
         drop_mask = (~exempt) & (~cf_exempt) & cond_low_yield & cond_3y_under & cond_ttm_under
         out = out[~drop_mask]
     # B32-UI v5: frfc 已废弃（与 FCF 评级多选语义重复），通过 fcf_rating_keep 实现

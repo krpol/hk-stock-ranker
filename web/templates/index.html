@@ -64,7 +64,7 @@
             <option value="{{ p }}" {% if p == selected_period %}selected{% endif %}>{{ p }}</option>
             {% endfor %}
         </select>
-        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="保留 TTM分红 ≥ 上年TTM分红 或 最近期分红 ≥ 同期上年分红（任一不降即保留）&#10;救生条件：最新 fy_div_per_share / current_price ≥ 15% 仍保留">
+        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="保留 TTM分红 ≥ 上年TTM分红 或 最近期分红 ≥ 同期上年分红（任一不降即保留）&#10;救生条件：(2×fy_div_per_share − prev_year_div_per_share) / current_price ≥ 15% 仍保留">
             <input type="checkbox" name="fdg" value="1" onchange="this.form.submit()" {% if filter_div_growth %}checked{% endif %}>
             分红同比不下降
         </label>
@@ -104,11 +104,11 @@
             <input type="checkbox" name="fndz" value="1" onchange="this.form.submit()" {% if filter_net_debt_z %}checked{% endif %}>
             有息负债/净资产 z>1.2 剔除
         </label>
-        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="保留 现金转化率 (3 年平均 OCF / 3 年平均营业利润) ≥ 0.5；银行/保险/其他金融/投资公司豁免；空值保留">
+        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="保留 现金转化率 (3 年平均 OCF / 3 年平均营业利润) ≥ 0.5；银行/保险/其他金融/投资公司豁免；现金堡垒豁免需同时 OCF_3y_avg > 0；空值保留">
             <input type="checkbox" name="fcc" value="1" onchange="this.form.submit()" {% if filter_cash_conversion %}checked{% endif %}>
             现金转化率≥0.5
         </label>
-        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="砍条件（三者同时满足才砍）：&#10;  ① real_fcf / 市值 ≤ 8%（FCF 收益率不到 8%）&#10;  ② 3y avg real_fcf / 3y avg 现金分红 < 1.0（长周期不足）&#10;  ③ 当年 real_fcf_ttm / 当年现金分红 < 1.0（TTM 不足）&#10;豁免：非派息股 / 金融行业 / 现金堡垒(cash−ibd>市值) 且 3y avg real_fcf + 0.1×(cash−ibd) > 3y avg 分红总额">
+        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="砍条件（三者同时满足才砍）：&#10;  ① real_fcf / 市值 ≤ 8%（FCF 收益率不到 8%）&#10;  ② 3y avg real_fcf / 3y avg 现金分红 < 1.0（长周期不足）&#10;  ③ 当年 real_fcf_ttm / 当年现金分红 < 1.0（TTM 不足）&#10;豁免：非派息股 / 金融行业 / 现金堡垒(cash−ibd>市值) 且 3y avg real_fcf + 0.1×(cash−ibd) > 3y avg 分红总额 且 real_fcf > 0">
             <input type="checkbox" name="fdcc" value="1" onchange="this.form.submit()" {% if filter_dividend_coverage %}checked{% endif %}>
             分红现金覆盖≥1
         </label>
