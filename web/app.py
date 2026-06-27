@@ -589,17 +589,8 @@ def _apply_filters(df: pd.DataFrame, filter_div_growth: bool, filter_return_grow
         cond_ttm_under = ttm_cover.notna() & (ttm_cover < 1.0)
         drop_mask = (~exempt) & (~cash_fortress) & cond_low_yield & cond_3y_under & cond_ttm_under
         out = out[~drop_mask]
-    if filter_real_fcf_coverage:
-        # B31: 剩余可用现金流偿债覆盖率
-        #   剩余 CF = OCF_3y − min(CapEx_3y + 期初租赁本金, D&A_3y)
-        #   覆盖率 = 剩余 CF / max(IBD − Cash, max(Equity × 1%, 1 亿))
-        #   砍掉 fcf_rating == "DROP" 的（real_fcf<0 或 覆盖率<5%）
-        #   现金堡垒（AAA）自动豁免；评级为 N/A 的保留（数据缺失不砍）
-        rating = out.get("fcf_rating")
-        if rating is not None:
-            drop_mask = (rating == "DROP")
-            out = out[~drop_mask]
-    # B32-UI: FCF 评级多选过滤（与 frfc 叠加，仅保留勾选的评级）
+    # B32-UI v5: frfc 已废弃（与 FCF 评级多选语义重复），通过 fcf_rating_keep 实现
+    # B32-UI: FCF 评级多选过滤（仅保留勾选的评级）
     if fcf_rating_keep is not None and len(fcf_rating_keep) > 0:
         rating = out.get("fcf_rating")
         if rating is not None:

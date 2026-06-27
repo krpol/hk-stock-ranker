@@ -104,11 +104,7 @@
             <input type="checkbox" name="fdcc" value="1" onchange="this.form.submit()" {% if filter_dividend_coverage %}checked{% endif %}>
             分红现金覆盖≥1
         </label>
-        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="B31: 剩余可用现金流偿债覆盖率 ≥ 15%&#10;  剩余 CF = 3y平均OCF − min(3y平均CapEx + 期初一年内到期租赁, 3y平均D&A)&#10;  ε = max(净资产 × 1%, 1亿)&#10;  覆盖率 = 剩余CF / max(IBD−Cash, ε)&#10;  剔除 fcf_rating==DROP (real_fcf<0 或 覆盖率<15%)&#10;  现金堡垒（cash − ibd > 市值）自动豁免，评级 AAA;&#10;  评级为 N/A 的（数据缺失）保留">
-            <input type="checkbox" name="frfc" value="1" onchange="this.form.submit()" {% if filter_real_fcf_coverage %}checked{% endif %}>
-            剩余CF/净债≥15%
-        </label>
-        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="勾选时：现金堡垒公司（cash − ibd > 市值）在 CC/DCC/Net D/E硬阈值/frfc 4 个过滤器中豁免（默认行为）。&#10;取消时：关闭豁免，所有公司一视同仁按硬规则砍。">
+        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="勾选时：现金堡垒公司（cash − ibd > 市值）在 CC/DCC/Net D/E硬阈值 等过滤器中豁免（默认行为）。&#10;取消时：关闭豁免，所有公司一视同仁按硬规则砍。">
             <input type="hidden" name="fcfx" value="0">
             <input type="checkbox" name="fcfx" value="1" onchange="this.form.submit()" {% if cash_fortress_exempt %}checked{% endif %}>
             现金堡垒豁免
@@ -164,12 +160,69 @@
     · 期间：<strong>{{ selected_period }}</strong>
 </div>
 
+{% set TOOLTIPS = {
+    "排名": "按综合得分降序",
+    "股票代码": "港股代码（5位，前补0）",
+    "公司名称": "中文名",
+    "所属行业": "行业分类（来自东方财富）",
+    "当前收盘价(HKD)": "排名时刻的当前价格",
+    "综合得分": "composite_score = return_z×1.0 + growth_factor×0.2 + cash_buffer_z×0.2 + fcf_div_z×0.1（B32-UI v5）",
+    "回报 Z": "return_zscore = winsorized_zscore(return_rate)，1%/99% 截尾后标准化",
+    "增长因子": "growth_factor = 加权平均(z_revenue×1 + z_opinc×1 + z_ocf×1 + z_ttm_return×2) / 总权重；NaN-safe",
+    "回报率(%)": "return_rate = (fy_div + real_buyback) / current_price × 100 − dilution × 100",
+    "可持续回报率(%)": "sustainable_return_rate = (min(fy_div, cap) + real_buyback) / price × 100 − dilution × 100\ncap = (real_fcf_3y + max(net_cash, 0) × 10%) / shares；金融/3yOCF 缺失豁免回退到 return_rate",
+    "真实TTM回报(HKD)": "real_ttm_return_rate = TTM 分红 + real_buyback（含 dilution 折算）",
+    "TTM回报(HKD)": "ttm_return_rate = TTM 分红 + buyback_per_share",
+    "上年TTM回报(HKD)": "prev_ttm_return_rate = 上年同期 TTM 回报",
+    "最近期分红(HKD)": "latest_period_div_per_share = 最近一期已派/已宣派的分红/股",
+    "同期上年分红(HKD)": "latest_period_yoy_div_per_share = 同期上年分红/股（YoY 对比）",
+    "预分红(HKD)": "forward_div_per_share = 已宣告但未派发的下期分红/股",
+    "真实每股回购(HKD)": "real_buyback_per_share = max(0, 回购总额 − 新发行总额) / 股本",
+    "每股回购(HKD)": "buyback_per_share = 回购总额 / 股本",
+    "上年每股回购(HKD)": "prev_buyback_per_share = 上年回购总额 / 股本",
+    "股本净变化(%)": "net_share_change_rate = (今年股本 − 上年股本) / 上年股本 × 100",
+    "年化稀释率": "annual_dilution_rate = 新发行股 / 总股本（年化）",
+    "TTM营收同比": "revenue_yoy = (TTM 营收 − 上年 TTM 营收) / |上年|",
+    "TTM营业利润同比": "operating_income_yoy = (TTM OpInc − 上年 TTM OpInc) / |上年|",
+    "TTM经营现金流同比": "operating_cashflow_yoy = (TTM OCF − 上年 TTM OCF) / |上年|",
+    "TTM回报金额同比": "ttm_return_yoy = (TTM 回报 − 上年 TTM 回报) / |上年|",
+    "营收增长 Z": "growth_zscore_revenue = winsorized_zscore(revenue_yoy)",
+    "营业利润增长 Z": "growth_zscore_operating_income = winsorized_zscore(operating_income_yoy)",
+    "经营现金流增长 Z": "growth_zscore_operating_cashflow = winsorized_zscore(operating_cashflow_yoy)",
+    "TTM回报增长 Z": "growth_zscore_ttm_return = winsorized_zscore(ttm_return_yoy)",
+    "现金缓冲比": "cash_buffer_ratio = (cash − ibd − 3×fy_div_total) / market_cap（注意：仍含 3 年分红扣减）",
+    "现金缓冲 Z": "cash_buffer_zscore = winsorized_zscore(cash_buffer_ratio)",
+    "有息负债率": "net_debt_ratio = interest_bearing_debt / total_assets",
+    "资产负债率": "total_liability_ratio = total_liabilities / total_assets",
+    "有息负债/净资产": "debt_to_equity = interest_bearing_debt / equity",
+    "ROE": "return_on_equity = net_income / equity_avg",
+    "总市值(HKD)": "market_cap = 当日成交额（B9 流动性口径，非真实市值）",
+    "当前财年末": "fiscal_year_end = 当前完整财年截止日",
+    "上年财年末": "prev_fiscal_year_end = 上一财年截止日",
+    "最近财报日": "latest_period_end = 最近一期报告期末",
+    "同期上年财报日": "prev_year_period_end = 同期上年报告期末",
+    "总股本": "shares_outstanding = 期末普通股总股本",
+    "上年总股本": "prev_shares_outstanding = 上年期末普通股总股本",
+    "回购总额(HKD)": "buyback_amount = 当期回购总金额",
+    "TTM分红(HKD)": "fy_div_per_share = 最新 TTM 每股现金分红",
+    "上年TTM分红(HKD)": "prev_year_div_per_share = 上年 TTM 每股现金分红",
+    "cash_and_equivalents": "现金及等价物（最新报告期）",
+    "interest_bearing_debt": "有息负债 = 短期借款 + 长期借款（最新报告期）",
+    "现金转化率": "cash_conversion = avg_3y(OCF) / avg_3y(OpInc)（OpInc<=0 → NaN）",
+    "剩余CF/净债": "coverage_ratio = real_fcf_3y / max(IBD − Cash, max(Equity×1%, 1亿))",
+    "FCF评级": "AAA=现金堡垒(cash−ibd>市值) | STRONG≥30% | OK 20-30% | WARN 15-20% | DROP <15% 或 real_fcf<0 | N/A 缺失\n降级：drop_ratio<30% 降一档；drop_ratio<0 降两档",
+    "近1年突降": "drop_ratio = real_fcf_ttm / real_fcf_3y；<30% 警告，<0 严重",
+    "分红现金覆盖": "dividend_coverage = real_fcf_3y / (avg_3y(fy_div) × shares)",
+    "剩余CF(亿)": "real_fcf_yi = real_fcf_3y / 1亿\nreal_fcf = OCF_3y − min(CapEx_TTM + 期初租赁, D&A_3y)",
+    "fcf_div_ratio": "real_fcf_3y / max(TTM 分红总额, market_cap × 5%)",
+    "fcf_div_zscore": "winsorized_zscore(fcf_div_ratio)；现金堡垒(AAA) 直接取最大 z",
+} %}
 <div class="table-wrap">
 <table>
     <thead>
         <tr>
             {% for col in columns %}
-            <th>{{ col }}</th>
+            <th title="{{ TOOLTIPS.get(col, col) }}">{{ col }}</th>
             {% endfor %}
         </tr>
     </thead>
