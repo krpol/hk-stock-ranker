@@ -448,9 +448,13 @@ def _apply_filters(df: pd.DataFrame, filter_div_growth: bool, filter_return_grow
                 out = out[~(z > 1.2).fillna(False)]
     if filter_growth_factor:
         # 剔除 growth_factor < -0.35（ranker 已预计算的加权 zscore 复合值）；NaN 保留
+        # B32-UI: 现金堡垒放宽到 -1.0
         gf = pd.to_numeric(out.get("growth_factor"), errors="coerce")
         if gf is not None:
-            out = out[~(gf < -0.35).fillna(False)]
+            cf_col = cash_fortress_col.reindex(out.index).fillna(False)
+            threshold = pd.Series(-0.35, index=out.index)
+            threshold[cf_col] = -1.0
+            out = out[~(gf < threshold).fillna(False)]
     if filter_roe_z:
         # B22: 横截面 zscore，剔除 z < -1.8；NaN 保留
         # B24-followup: mu/sd 基于全池 df 计算

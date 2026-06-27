@@ -76,7 +76,7 @@
             <input type="checkbox" name="focf" value="1" onchange="this.form.submit()" {% if filter_ocf %}checked{% endif %}>
             现金流降幅≤50%
         </label>
-        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="剔除 成长因子(growth_factor) < -0.35（加权 zscore 复合得分：revenue/operating_income/operating_cashflow 权重 1，ttm_return 权重 2；NaN 保留）">
+        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="剔除 成长因子(growth_factor) < -0.35（加权 zscore 复合得分：revenue/operating_income/operating_cashflow 权重 1，ttm_return 权重 2；NaN 保留）&#10;现金堡垒公司放宽到 < -1.0">
             <input type="checkbox" name="fgf" value="1" onchange="this.form.submit()" {% if filter_growth_factor %}checked{% endif %}>
             成长因子 ≥ -0.35
         </label>
