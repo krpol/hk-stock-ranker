@@ -108,6 +108,19 @@
             <input type="checkbox" name="frfc" value="1" onchange="this.form.submit()" {% if filter_real_fcf_coverage %}checked{% endif %}>
             剩余CF/净债≥5%
         </label>
+        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="勾选时：现金堡垒公司（cash − ibd − 3×div > 市值）在 CC/DCC/Net D/E硬阈值/frfc 4 个过滤器中豁免（默认行为）。&#10;取消时：关闭豁免，所有公司一视同仁按硬规则砍。">
+            <input type="hidden" name="fcfx" value="0">
+            <input type="checkbox" name="fcfx" value="1" onchange="this.form.submit()" {% if cash_fortress_exempt %}checked{% endif %}>
+            现金堡垒豁免
+        </label>
+        <span style="font-size:0.88rem;display:flex;align-items:center;gap:5px;" title="FCF 评级多选（不勾任何 = 不限）。&#10;STRONG: real_fcf>0 且覆盖率≥30%&#10;OK: real_fcf>0 且覆盖率 15-30%&#10;WARN: real_fcf>0 且覆盖率 5-15%&#10;DROP: real_fcf<0 或覆盖率<5%&#10;AAA: 现金堡垒（自动）&#10;N/A: 数据缺失">
+            评级:
+            {% for r in ["STRONG","OK","WARN","DROP","AAA","N/A"] %}
+            <label style="display:flex;align-items:center;gap:2px;cursor:pointer;">
+                <input type="checkbox" name="frating" value="{{ r }}" onchange="this.form.submit()" {% if r in fcf_rating_keep %}checked{% endif %}>{{ r }}
+            </label>
+            {% endfor %}
+        </span>
         <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="动量过滤（3 条任一命中即剔除）：&#10;  - 加权动量因子 mom_factor > 2&#10;  - 6 月动量 z_mom6 < -3 （6月深跌）&#10;  - 1 月动量 z_mom1 > 2.0 （1月过热）&#10;加权公式：mom_factor=(1·z1+2·z3+1·z6+1·z9)/5">
             <input type="checkbox" name="fmom" value="1" onchange="this.form.submit()" {% if filter_momentum %}checked{% endif %}>
             动量过滤
@@ -187,7 +200,10 @@
 </table>
 </div>
 
-{%- set qs = '&per_page=' ~ per_page ~ ('&fdg=1' if filter_div_growth else '') ~ ('&frg=1' if filter_return_growth else '') ~ ('&frb=1' if filter_real_buyback else '') ~ ('&frv=1' if filter_revenue else '') ~ ('&f3l=1' if filter_price_3y_low_3x else '') ~ ('&f6l=1' if filter_price_6m_low_18x else '') ~ ('&f2l=1' if filter_price_2m_low_13x else '') ~ ('&focf=1' if filter_ocf else '') ~ ('&fmom=1' if filter_momentum else '') ~ ('&fnd=1' if filter_net_debt_hard else '') ~ ('&fndz=1' if filter_net_debt_z else '') ~ ('&fgf=1' if filter_growth_factor else '') ~ ('&froez=1' if filter_roe_z else '') ~ ('&ftoz=1' if filter_turnover_z else '') ~ ('&fcc=1' if filter_cash_conversion else '') ~ ('&fdcc=1' if filter_dividend_coverage else '') ~ ('&frfc=1' if filter_real_fcf_coverage else '') ~ (('&sort=' ~ sort_by) if sort_by and sort_by != 'composite' else '') -%}
+{%- set ns = namespace(qs='&per_page=' ~ per_page ~ ('&fdg=1' if filter_div_growth else '') ~ ('&frg=1' if filter_return_growth else '') ~ ('&frb=1' if filter_real_buyback else '') ~ ('&frv=1' if filter_revenue else '') ~ ('&f3l=1' if filter_price_3y_low_3x else '') ~ ('&f6l=1' if filter_price_6m_low_18x else '') ~ ('&f2l=1' if filter_price_2m_low_13x else '') ~ ('&focf=1' if filter_ocf else '') ~ ('&fmom=1' if filter_momentum else '') ~ ('&fnd=1' if filter_net_debt_hard else '') ~ ('&fndz=1' if filter_net_debt_z else '') ~ ('&fgf=1' if filter_growth_factor else '') ~ ('&froez=1' if filter_roe_z else '') ~ ('&ftoz=1' if filter_turnover_z else '') ~ ('&fcc=1' if filter_cash_conversion else '') ~ ('&fdcc=1' if filter_dividend_coverage else '') ~ ('&frfc=1' if filter_real_fcf_coverage else '') ~ ('&fcfx=1' if cash_fortress_exempt else '&fcfx=0')) -%}
+{%- for r in fcf_rating_keep %}{%- set ns.qs = ns.qs ~ '&frating=' ~ r %}{%- endfor -%}
+{%- if sort_by and sort_by != 'composite' %}{%- set ns.qs = ns.qs ~ '&sort=' ~ sort_by %}{%- endif -%}
+{%- set qs = ns.qs -%}
 <div class="pagination">
     {% if page > 1 %}
     <a href="?period={{ selected_period }}&page={{ page-1 }}{{ qs }}">« 上一页</a>

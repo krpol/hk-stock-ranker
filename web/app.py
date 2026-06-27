@@ -8,6 +8,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from flask import Flask, render_template, request, send_file, jsonify
 import pandas as pd
+from typing import Optional
 
 from storage.store import load_ranking, list_ranking_periods, EXCEL_DIR, RANKING_EXCEL
 from engine.ranker import rename_for_display
@@ -355,7 +356,7 @@ def _load_turnover_12m_map() -> dict:
         return {}
 
 
-def _apply_filters(df: pd.DataFrame, filter_div_growth: bool, filter_return_growth: bool, filter_real_buyback: bool = False, filter_revenue: bool = False, filter_price_3y_low_3x: bool = False, filter_price_6m_low_18x: bool = False, filter_price_2m_low_13x: bool = False, filter_ocf: bool = False, filter_momentum: bool = False, filter_net_debt_hard: bool = False, filter_net_debt_z: bool = False, filter_growth_factor: bool = False, filter_roe_z: bool = False, filter_turnover_z: bool = False, filter_cash_conversion: bool = False, filter_dividend_coverage: bool = False, filter_real_fcf_coverage: bool = False) -> pd.DataFrame:
+def _apply_filters(df: pd.DataFrame, filter_div_growth: bool, filter_return_growth: bool, filter_real_buyback: bool = False, filter_revenue: bool = False, filter_price_3y_low_3x: bool = False, filter_price_6m_low_18x: bool = False, filter_price_2m_low_13x: bool = False, filter_ocf: bool = False, filter_momentum: bool = False, filter_net_debt_hard: bool = False, filter_net_debt_z: bool = False, filter_growth_factor: bool = False, filter_roe_z: bool = False, filter_turnover_z: bool = False, filter_cash_conversion: bool = False, filter_dividend_coverage: bool = False, filter_real_fcf_coverage: bool = False, cash_fortress_exempt: bool = True, fcf_rating_keep: Optional[list] = None) -> pd.DataFrame:
     """根据筛选项过滤 DataFrame。
     - filter_div_growth: 剔除 TTM分红 < 上年TTM分红 且 最近期分红 < 同期上年分红
       （即 TTM 与最近期"两项都下降"才剔除；任一项不降则保留）
@@ -383,6 +384,9 @@ def _apply_filters(df: pd.DataFrame, filter_div_growth: bool, filter_return_grow
     if cash_fortress_col is None:
         cash_fortress_col = pd.Series(False, index=out.index)
     cash_fortress_col = cash_fortress_col.fillna(False).astype(bool)
+    # B32-UI: 用户可关闭 cash_fortress 豁免
+    if not cash_fortress_exempt:
+        cash_fortress_col = pd.Series(False, index=out.index)
     if filter_div_growth:
         a = out.get("fy_div_per_share")
         b = out.get("prev_year_div_per_share")
@@ -500,6 +504,12 @@ def _apply_filters(df: pd.DataFrame, filter_div_growth: bool, filter_return_grow
         if rating is not None:
             drop_mask = (rating == "DROP")
             out = out[~drop_mask]
+    # B32-UI: FCF 评级多选过滤（与 frfc 叠加，仅保留勾选的评级）
+    if fcf_rating_keep is not None and len(fcf_rating_keep) > 0:
+        rating = out.get("fcf_rating")
+        if rating is not None:
+            keep_mask = rating.astype(str).isin(fcf_rating_keep)
+            out = out[keep_mask]
     if filter_momentum:
         # B20: 动量过滤（B24-followup: zscore 基于全池 df，避免叠加后池缩水导致 z 偏移）
         from web.momentum import apply_momentum_filter
@@ -554,6 +564,11 @@ def index():
     filter_cash_conversion = request.args.get("fcc") == "1"
     filter_dividend_coverage = request.args.get("fdcc") == "1"
     filter_real_fcf_coverage = request.args.get("frfc") == "1"
+    # B32-UI: cash_fortress 豁免开关（默认开）；FCF 评级多选
+    # checkbox + hidden trick：URL 可能同时出现 fcfx=0&fcfx=1（勾上）或仅 fcfx=0（未勾）或都没传（代表不溉默认）
+    _fcfx_vals = request.args.getlist("fcfx")
+    cash_fortress_exempt = "1" in _fcfx_vals if _fcfx_vals else True
+    fcf_rating_keep = request.args.getlist("frating")  # [] = 不限
     sort_by = request.args.get("sort", "composite")  # composite | return | sustainable
 
     df = pd.DataFrame()
@@ -562,7 +577,7 @@ def index():
         df = _attach_cashflow_factors(df)
 
     total_unfiltered = len(df)
-    df = _apply_filters(df, filter_div_growth, filter_return_growth, filter_real_buyback, filter_revenue, filter_price_3y_low_3x, filter_price_6m_low_18x, filter_price_2m_low_13x, filter_ocf, filter_momentum, filter_net_debt_hard, filter_net_debt_z, filter_growth_factor, filter_roe_z, filter_turnover_z, filter_cash_conversion, filter_dividend_coverage, filter_real_fcf_coverage)
+    df = _apply_filters(df, filter_div_growth, filter_return_growth, filter_real_buyback, filter_revenue, filter_price_3y_low_3x, filter_price_6m_low_18x, filter_price_2m_low_13x, filter_ocf, filter_momentum, filter_net_debt_hard, filter_net_debt_z, filter_growth_factor, filter_roe_z, filter_turnover_z, filter_cash_conversion, filter_dividend_coverage, filter_real_fcf_coverage, cash_fortress_exempt=cash_fortress_exempt, fcf_rating_keep=fcf_rating_keep or None)
 
     # B28: 排序切换
     if not df.empty:
@@ -647,6 +662,8 @@ def index():
         filter_cash_conversion=filter_cash_conversion,
         filter_dividend_coverage=filter_dividend_coverage,
         filter_real_fcf_coverage=filter_real_fcf_coverage,
+        cash_fortress_exempt=cash_fortress_exempt,
+        fcf_rating_keep=fcf_rating_keep,
         sort_by=sort_by,
     )
 
@@ -678,12 +695,15 @@ def api_ranking():
     filter_cash_conversion = request.args.get("fcc") == "1"
     filter_dividend_coverage = request.args.get("fdcc") == "1"
     filter_real_fcf_coverage = request.args.get("frfc") == "1"
-    df = _apply_filters(df, filter_div_growth, filter_return_growth, filter_real_buyback, filter_revenue, filter_price_3y_low_3x, filter_price_6m_low_18x, filter_price_2m_low_13x, filter_ocf, filter_momentum, filter_net_debt_hard, filter_net_debt_z, filter_growth_factor, filter_roe_z, filter_turnover_z, filter_cash_conversion, filter_dividend_coverage, filter_real_fcf_coverage)
+    _fcfx_vals = request.args.getlist("fcfx")
+    cash_fortress_exempt = "1" in _fcfx_vals if _fcfx_vals else True
+    fcf_rating_keep = request.args.getlist("frating")
+    df = _apply_filters(df, filter_div_growth, filter_return_growth, filter_real_buyback, filter_revenue, filter_price_3y_low_3x, filter_price_6m_low_18x, filter_price_2m_low_13x, filter_ocf, filter_momentum, filter_net_debt_hard, filter_net_debt_z, filter_growth_factor, filter_roe_z, filter_turnover_z, filter_cash_conversion, filter_dividend_coverage, filter_real_fcf_coverage, cash_fortress_exempt=cash_fortress_exempt, fcf_rating_keep=fcf_rating_keep or None)
     return jsonify({
         "period": period,
         "total": len(df),
         "total_unfiltered": total_unfiltered,
-        "filters": {"fdg": filter_div_growth, "frg": filter_return_growth, "frb": filter_real_buyback, "frv": filter_revenue, "f3l": filter_price_3y_low_3x, "f6l": filter_price_6m_low_18x, "f2l": filter_price_2m_low_13x, "focf": filter_ocf, "fmom": filter_momentum, "fnd": filter_net_debt_hard, "fndz": filter_net_debt_z, "fgf": filter_growth_factor, "froez": filter_roe_z, "ftoz": filter_turnover_z, "fcc": filter_cash_conversion, "fdcc": filter_dividend_coverage, "frfc": filter_real_fcf_coverage},
+        "filters": {"fdg": filter_div_growth, "frg": filter_return_growth, "frb": filter_real_buyback, "frv": filter_revenue, "f3l": filter_price_3y_low_3x, "f6l": filter_price_6m_low_18x, "f2l": filter_price_2m_low_13x, "focf": filter_ocf, "fmom": filter_momentum, "fnd": filter_net_debt_hard, "fndz": filter_net_debt_z, "fgf": filter_growth_factor, "froez": filter_roe_z, "ftoz": filter_turnover_z, "fcc": filter_cash_conversion, "fdcc": filter_dividend_coverage, "frfc": filter_real_fcf_coverage, "fcfx": cash_fortress_exempt, "frating": fcf_rating_keep},
         "data": df.to_dict(orient="records"),
     })
 
