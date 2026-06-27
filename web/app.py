@@ -484,24 +484,28 @@ def _apply_filters(df: pd.DataFrame, filter_div_growth: bool, filter_return_grow
             drop_mask = (~exempt) & (~cash_fortress) & cc.notna() & (cc < 0.5)
             out = out[~drop_mask]
     if filter_dividend_coverage:
-        # B25: Dividend Cash Coverage = real_fcf_3y / cash_div_3y ≥ 1.0
-        # 仅对派息股生效，非派息股（dividend_coverage=NaN）保留；金融行业豁免
-        # B29/B31: 现金堡垒豁免（统一公司级标记 _cash_fortress）
-        # B32-UI: 增加二重条件 real_fcf / market_cap ≤ 10% 才砍（FCF 收益率 ≤ 10%）
-        dcc = pd.to_numeric(out.get("dividend_coverage"), errors="coerce")
-        if dcc is not None:
-            ind = out.get("industry").astype(str) if "industry" in out.columns else None
-            exempt = ind.isin(_FIN_INDUSTRY_EXEMPT) if ind is not None else pd.Series(False, index=out.index)
-            cash_fortress = cash_fortress_col.reindex(out.index).fillna(False)
-            # real_fcf / market_cap
-            rfcf = pd.to_numeric(out.get("real_fcf"), errors="coerce")
-            cp = pd.to_numeric(out.get("current_price"), errors="coerce")
-            shs = pd.to_numeric(out.get("shares_outstanding"), errors="coerce")
-            mcap = cp * shs
-            fcf_yield = (rfcf / mcap.where(mcap > 0))
-            low_fcf_yield = fcf_yield.fillna(-9.99) <= 0.10  # NaN 视作"低"（保守：缺数据时仍砍）
-            drop_mask = (~exempt) & (~cash_fortress) & dcc.notna() & (dcc < 1.0) & low_fcf_yield
-            out = out[~drop_mask]
+        # B25 → B32-UI v2: 分红现金覆盖过滤
+        # 砍条件（同时满足）：
+        #   ① real_fcf / market_cap ≤ 8%（FCF 收益率不高）
+        #   ② real_fcf_ttm / (当年分红/股 × 总股本) < 1.0（当年 TTM FCF 不够覆盖当年分红）
+        # 仅对派息股生效；金融行业豁免；现金堡垒豁免
+        ind = out.get("industry").astype(str) if "industry" in out.columns else None
+        exempt = ind.isin(_FIN_INDUSTRY_EXEMPT) if ind is not None else pd.Series(False, index=out.index)
+        cash_fortress = cash_fortress_col.reindex(out.index).fillna(False)
+        rfcf = pd.to_numeric(out.get("real_fcf"), errors="coerce")
+        rfcf_ttm = pd.to_numeric(out.get("real_fcf_ttm"), errors="coerce")
+        cp = pd.to_numeric(out.get("current_price"), errors="coerce")
+        shs = pd.to_numeric(out.get("shares_outstanding"), errors="coerce")
+        fyd_ps = pd.to_numeric(out.get("fy_div_per_share"), errors="coerce")
+        mcap = cp * shs
+        annual_div_total = fyd_ps * shs
+        # 条件①：FCF 收益率 ≤ 8%（NaN 视作"低"，按砍方向；保守口径）
+        cond_low_yield = (rfcf / mcap.where(mcap > 0)).fillna(-9.99) <= 0.08
+        # 条件②：当年 TTM coverage < 1（仅对派息股 annual_div_total > 0 生效；非派息保留）
+        ttm_cover = rfcf_ttm / annual_div_total.where(annual_div_total > 0)
+        cond_ttm_under = ttm_cover.notna() & (ttm_cover < 1.0)
+        drop_mask = (~exempt) & (~cash_fortress) & cond_low_yield & cond_ttm_under
+        out = out[~drop_mask]
     if filter_real_fcf_coverage:
         # B31: 剩余可用现金流偿债覆盖率
         #   剩余 CF = OCF_3y − min(CapEx_3y + 期初租赁本金, D&A_3y)
