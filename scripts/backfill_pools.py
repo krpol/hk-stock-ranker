@@ -49,6 +49,7 @@ from collectors.hk_financial import (
     has_share_dilution,
     has_recent_dividend_or_forward,
     AH_DUAL_LISTED_STOCKS,
+    DUAL_LISTED_EXEMPT,
     _get_ticker,
 )
 from storage import store as _store
@@ -116,8 +117,8 @@ def _prefetch_ticker_data(
                 break
 
     # ---- 2. 月末股份数（get_shares_full） ----
-    # A+H 双重上市股票直接跳过（与 has_share_dilution 行为一致）
-    if code in AH_DUAL_LISTED_STOCKS:
+    # 双重上市股票直接跳过（与 has_share_dilution 行为一致）
+    if code in DUAL_LISTED_EXEMPT:
         return divs, None  # None 表示豁免（决策时不剔除）
 
     for attempt in range(max_retries):
@@ -191,7 +192,7 @@ def _decide_share_dilution(monthly_shares: Optional[pd.Series],
     从月末股份数切片判定（等价 has_share_dilution，返回 should_filter）。
     monthly_shares=None 表示 A+H 豁免，直接 False（不剔除）。
     """
-    if code in AH_DUAL_LISTED_STOCKS:
+    if code in DUAL_LISTED_EXEMPT:
         return False
     if monthly_shares is None:
         return False

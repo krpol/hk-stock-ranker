@@ -69,6 +69,14 @@ AH_DUAL_LISTED_STOCKS: set[str] = {
     "08115",
 }
 
+# 美股 + 港股双重上市豁免（yfinance 在两个市场股本口径间切换，造成虚假股本跳增）
+US_HK_DUAL_LISTED_STOCKS: set[str] = {
+    "06686",  # 诺亚控股 NOAH (美股私有化 + 港股二次上市，2023-10 股本 10× 跳增为市场切换而非稀释)
+}
+
+# 合集：所有双重上市豁免名单
+DUAL_LISTED_EXEMPT: set[str] = AH_DUAL_LISTED_STOCKS | US_HK_DUAL_LISTED_STOCKS
+
 
 def _hk_ticker(code: str) -> str:
     """
@@ -294,9 +302,9 @@ def has_share_dilution(code: str, years: int = 3,
         - max_decrease_pct: 最大年度股份数降幅（正数，如0.15代表减少15%）；
           调用方可通过 0.10 < max_decrease_pct < 0.30 识别需人工验证的灰色股票
     """
-    # A+H 双重上市股票豁免：yfinance 对其股份数数据在 A+H 口径间切换，不可靠
-    if code in AH_DUAL_LISTED_STOCKS:
-        logger.debug(f"[{code}] A+H 双重上市，跳过股份稀释检测")
+    # 双重上市股票豁免（A+H 或 美股+港股）：yfinance 股份数口径不可靠
+    if code in DUAL_LISTED_EXEMPT:
+        logger.debug(f"[{code}] 双重上市，跳过股份稀释检测")
         return (False, 0.0)
 
     end_date = as_of_date or datetime.now()
@@ -428,7 +436,7 @@ def get_annual_dilution_rate(code: str, years: int = 3) -> float:
       4. CAGR <= 0（净回购/合股）返回 0
       5. balance_sheet < 2 行则回退 get_shares_full + B10 噪音过滤
     """
-    if code in AH_DUAL_LISTED_STOCKS:
+    if code in DUAL_LISTED_EXEMPT:
         return 0.0
 
     max_retries = 3
