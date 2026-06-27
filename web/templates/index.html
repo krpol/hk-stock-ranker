@@ -76,19 +76,19 @@
             <input type="checkbox" name="frb" value="1" onchange="this.form.submit()" {% if filter_real_buyback %}checked{% endif %}>
             真实回购
         </label>
-        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="保留 TTM营收同比 ≥ -10%（下降不超过 10%；空值被剔除）&#10;现金堡垒公司放宽到 ≥ -30%">
+        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="保留 TTM营收同比 ≥ -10%（下降不超过 10%；空值被剔除）&#10;现金堡垒公司放宽到 ≥ -30%&#10;净现金<0（cash−ibd<0）收紧到 ≥ 0%【营收不能下降】">
             <input type="checkbox" name="frv" value="1" onchange="this.form.submit()" {% if filter_revenue %}checked{% endif %}>
             营收降幅≤10%
         </label>
-        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="保留 经营现金流 TTM 同比 ≥ -50%（减少不超过 50%；空值被剔除）&#10;现金堡垒公司放宽到 ≥ -80%">
+        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="保留 经营现金流 TTM 同比 ≥ -50%（减少不超过 50%；空值被剔除）&#10;现金堡垒公司放宽到 ≥ -80%&#10;净现金<0 收紧到 ≥ -20%">
             <input type="checkbox" name="focf" value="1" onchange="this.form.submit()" {% if filter_ocf %}checked{% endif %}>
             现金流降幅≤50%
         </label>
-        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="剔除 成长因子(growth_factor) < -0.35（加权 zscore 复合得分：revenue/operating_income/operating_cashflow 权重 1，ttm_return 权重 2；NaN 保留）&#10;现金堡垒公司放宽到 < -1.0">
+        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="剔除 成长因子(growth_factor) < -0.35（加权 zscore 复合得分：revenue/operating_income/operating_cashflow 权重 1，ttm_return 权重 2；NaN 保留）&#10;现金堡垒公司放宽到 < -1.0&#10;净现金<0 收紧到 < -0.10">
             <input type="checkbox" name="fgf" value="1" onchange="this.form.submit()" {% if filter_growth_factor %}checked{% endif %}>
             成长因子 ≥ -0.35
         </label>
-        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="剔除 ROE 横截面 z<-1.8（ROE 显著低于均值 1.8σ）；NaN 保留">
+        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="剔除 ROE 横截面 z<-1.8（ROE 显著低于均值 1.8σ）；NaN 保留&#10;净现金<0 收紧到 z<-1.0">
             <input type="checkbox" name="froez" value="1" onchange="this.form.submit()" {% if filter_roe_z %}checked{% endif %}>
             ROE z≥-1.8
         </label>
@@ -108,7 +108,7 @@
             <input type="checkbox" name="fcc" value="1" onchange="this.form.submit()" {% if filter_cash_conversion %}checked{% endif %}>
             现金转化率≥0.5
         </label>
-        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="砍条件（三者同时满足才砍）：&#10;  ① real_fcf / 市值 ≤ 8%（FCF 收益率不到 8%）&#10;  ② 3y avg real_fcf / 3y avg 现金分红 < 1.0（长周期不足）&#10;  ③ 当年 real_fcf_ttm / 当年现金分红 < 1.0（TTM 不足）&#10;豁免：非派息股 / 金融行业 / 现金堡垒（cash − ibd > 市值）">
+        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="砍条件（三者同时满足才砍）：&#10;  ① real_fcf / 市值 ≤ 8%（FCF 收益率不到 8%）&#10;  ② 3y avg real_fcf / 3y avg 现金分红 < 1.0（长周期不足）&#10;  ③ 当年 real_fcf_ttm / 当年现金分红 < 1.0（TTM 不足）&#10;豁免：非派息股 / 金融行业 / 可分配覆盖（3y avg real_fcf + 0.1×(cash−ibd) > 3y avg 分红总额）">
             <input type="checkbox" name="fdcc" value="1" onchange="this.form.submit()" {% if filter_dividend_coverage %}checked{% endif %}>
             分红现金覆盖≥1
         </label>
