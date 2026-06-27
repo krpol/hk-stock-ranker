@@ -371,7 +371,7 @@ def _attach_cashflow_factors(df: pd.DataFrame) -> pd.DataFrame:
     gz = pd.to_numeric(out.get("growth_factor"), errors="coerce").fillna(0.0)
     cbz2 = pd.to_numeric(out["cash_buffer_zscore_v2"], errors="coerce").fillna(0.0)
     fyz = pd.to_numeric(out["fcf_yield_zscore"], errors="coerce").fillna(0.0)
-    out["composite_score"] = (srz * 1.0 + gz * 0.2 + cbz2 * 0.2 + fyz * 0.1).round(4)
+    out["composite_score"] = (srz * 1.0 + gz * 0.2 + cbz2 * 0.2 + fyz * 0.2).round(4)
 
 
     # 清理 merge 残留 + 内部辅助列
