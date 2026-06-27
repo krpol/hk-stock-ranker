@@ -617,7 +617,8 @@ def _apply_filters(df: pd.DataFrame, filter_div_growth: bool, filter_return_grow
         # ③ TTM coverage < 1
         ttm_cover = rfcf_ttm / annual_div_total.where(annual_div_total > 0)
         cond_ttm_under = ttm_cover.notna() & (ttm_cover < 1.0)
-        # 豁免：可分配总额（3y real_fcf + 0.1×净现金）盖得住 3y 平均分红
+        # 豁免：现金堡垒 且 可分配总额（3y real_fcf + 0.1×净现金）盖得住 3y 平均分红
+        cash_fortress = cash_fortress_col.reindex(out.index).fillna(False)
         ibd = pd.to_numeric(out.get("interest_bearing_debt"), errors="coerce")
         cash = pd.to_numeric(out.get("cash_and_equivalents"), errors="coerce")
         net_cash_abs = cash.fillna(0) - ibd.fillna(0)
@@ -626,8 +627,9 @@ def _apply_filters(df: pd.DataFrame, filter_div_growth: bool, filter_return_grow
         two_ago_div_ps = pd.to_numeric(out["two_years_ago_div_per_share"], errors="coerce") if "two_years_ago_div_per_share" in out.columns else pd.Series(0.0, index=out.index)
         div_3y_avg_ps = (fyd_ps.fillna(0) + prev_div_ps.fillna(0) + two_ago_div_ps.fillna(0)) / 3.0
         div_3y_total = div_3y_avg_ps * shs.fillna(0)
-        dist_exempt = ((div_3y_total > 0) & (dist_total > div_3y_total)).fillna(False)
-        drop_mask = (~exempt) & (~dist_exempt) & cond_low_yield & cond_3y_under & cond_ttm_under
+        dist_cover = ((div_3y_total > 0) & (dist_total > div_3y_total)).fillna(False)
+        cf_exempt = cash_fortress & dist_cover
+        drop_mask = (~exempt) & (~cf_exempt) & cond_low_yield & cond_3y_under & cond_ttm_under
         out = out[~drop_mask]
     # B32-UI v5: frfc 已废弃（与 FCF 评级多选语义重复），通过 fcf_rating_keep 实现
     # B32-UI: FCF 评级多选过滤（仅保留勾选的评级）
