@@ -279,7 +279,9 @@ def _attach_cashflow_factors(df: pd.DataFrame) -> pd.DataFrame:
     fin_exempt = ind.isin(_FIN_INDUSTRY_EXEMPT)
     rfcf_abs = pd.to_numeric(out["real_fcf"], errors="coerce")          # 绝对值（3y 平均）
     net_cash_abs = cash_s.fillna(0) - ibd_s.fillna(0)                    # 绝对值
-    cap_total = rfcf_abs + net_cash_abs * 0.1                            # 可分配总额（绝对）
+    # 净现金 > 0 才生效（负净现金不再扣 cap，避免 real_fcf 与净负债双重惩罚）
+    net_cash_pos = net_cash_abs.clip(lower=0)
+    cap_total = rfcf_abs + net_cash_pos * 0.1                            # 可分配总额（绝对）
     cap_per_share = cap_total / shs.where(shs > 0)
     cap = cap_per_share.clip(lower=0)                                    # 负 → 0
     fy_div_ps = pd.to_numeric(out.get("fy_div_per_share"), errors="coerce").fillna(0)
