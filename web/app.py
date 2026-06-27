@@ -374,6 +374,17 @@ def _attach_cashflow_factors(df: pd.DataFrame) -> pd.DataFrame:
     out["composite_score"] = (srz * 1.0 + gz * 0.2 + cbz2 * 0.2 + fyz * 0.2).round(4)
 
 
+    # B32-UI v9: 保留 OCF_3y_avg 是否为正的布尔标记（drop 后 filter 仍可用）
+    if "ocf_3y_avg" in out.columns:
+        out["_ocf_3y_pos"] = pd.to_numeric(out["ocf_3y_avg"], errors="coerce").fillna(0) > 0
+    else:
+        out["_ocf_3y_pos"] = False
+    # B32-UI v9: 保留 two_years_ago_div_per_share 数值（drop 后 fdcc 仍可用）
+    if "two_years_ago_div_per_share" in out.columns:
+        out["_two_years_ago_div_per_share"] = pd.to_numeric(out["two_years_ago_div_per_share"], errors="coerce")
+    else:
+        out["_two_years_ago_div_per_share"] = 0.0
+
     # 清理 merge 残留 + 内部辅助列
     out = out.drop(columns=[
         "ttm_operating_cashflow", "prev_ttm_operating_cashflow", "ttm_operating_cashflow_t2",
@@ -593,7 +604,7 @@ def _apply_filters(df: pd.DataFrame, filter_div_growth: bool, filter_return_grow
             ind = out.get("industry").astype(str) if "industry" in out.columns else None
             exempt = ind.isin(_FIN_INDUSTRY_EXEMPT) if ind is not None else pd.Series(False, index=out.index)
             cash_fortress = cash_fortress_col.reindex(out.index).fillna(False)
-            ocf_3y_pos = pd.to_numeric(out.get("ocf_3y_avg"), errors="coerce").fillna(0) > 0
+            ocf_3y_pos = out["_ocf_3y_pos"].astype(bool).reindex(out.index).fillna(False) if "_ocf_3y_pos" in out.columns else pd.Series(False, index=out.index)
             cf_exempt = cash_fortress & ocf_3y_pos
             # 剔除：非金融 + 非(堡垒且OCF>0) + 非NaN + cc<0.5
             drop_mask = (~exempt) & (~cf_exempt) & cc.notna() & (cc < 0.5)
@@ -629,7 +640,7 @@ def _apply_filters(df: pd.DataFrame, filter_div_growth: bool, filter_return_grow
         net_cash_abs = cash.fillna(0) - ibd.fillna(0)
         dist_total = rfcf.fillna(0) + 0.1 * net_cash_abs
         prev_div_ps = pd.to_numeric(out["prev_year_div_per_share"], errors="coerce") if "prev_year_div_per_share" in out.columns else pd.Series(0.0, index=out.index)
-        two_ago_div_ps = pd.to_numeric(out["two_years_ago_div_per_share"], errors="coerce") if "two_years_ago_div_per_share" in out.columns else pd.Series(0.0, index=out.index)
+        two_ago_div_ps = pd.to_numeric(out["_two_years_ago_div_per_share"], errors="coerce") if "_two_years_ago_div_per_share" in out.columns else pd.Series(0.0, index=out.index)
         div_3y_avg_ps = (fyd_ps.fillna(0) + prev_div_ps.fillna(0) + two_ago_div_ps.fillna(0)) / 3.0
         div_3y_total = div_3y_avg_ps * shs.fillna(0)
         dist_cover = ((div_3y_total > 0) & (dist_total > div_3y_total)).fillna(False)
