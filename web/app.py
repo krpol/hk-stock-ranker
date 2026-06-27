@@ -204,32 +204,7 @@ def _attach_cashflow_factors(df: pd.DataFrame) -> pd.DataFrame:
     # 保留 3y avg OCF/股 给 §11 sustainable_return_rate 使用
     out["_ocf_per_share_3y_avg"] = ocf_avg / shs.where(shs > 0)
 
-    # B27: sustainable_return_rate = (capped_fy_div + real_buyback) / current_price - dilution
-    # 封顶：fy_div_per_share 不得超过 3y avg OCF/股（OCF<=0 → cap=0 即砍掉分红）
-    # 金融行业豁免；3y OCF 缺失豁免（=return_rate）
-    ind = out.get("industry").astype(str) if "industry" in out.columns else pd.Series("", index=out.index)
-    fin_exempt = ind.isin(_FIN_INDUSTRY_EXEMPT)
-    ocf_ps = pd.to_numeric(out["_ocf_per_share_3y_avg"], errors="coerce")
-    cap = ocf_ps.clip(lower=0)  # 负 OCF → 0
-    fy_div_ps = pd.to_numeric(out.get("fy_div_per_share"), errors="coerce").fillna(0)
-    capped_fy_div = pd.concat([fy_div_ps, cap], axis=1).min(axis=1)
-    rb = pd.to_numeric(out.get("real_buyback_per_share"), errors="coerce").fillna(0)
-    cp = pd.to_numeric(out.get("current_price"), errors="coerce")
-    dil = pd.to_numeric(out.get("annual_dilution_rate"), errors="coerce").fillna(0)
-    sust = (capped_fy_div + rb) / cp.where(cp > 0) * 100 - dil * 100
-    # 豁免回退到 return_rate
-    ret = pd.to_numeric(out.get("return_rate"), errors="coerce")
-    sust = sust.where(ocf_ps.notna() & ~fin_exempt, ret)
-    out["sustainable_return_rate"] = sust.round(4)
-
-    # B28: 让 sustainable_return_rate 紧跟 return_rate 显示
-    if "return_rate" in out.columns:
-        cols = list(out.columns)
-        if "sustainable_return_rate" in cols:
-            cols.remove("sustainable_return_rate")
-            idx = cols.index("return_rate") + 1
-            cols.insert(idx, "sustainable_return_rate")
-            out = out[cols]
+    # sustainable_return_rate 计算延后到 real_fcf 算完之后
 
     # B31 + B32: 剩余可用现金流偿债覆盖率（含 TTM 突降监测）
     from engine.real_fcf import evaluate as _fcf_evaluate
@@ -295,6 +270,37 @@ def _attach_cashflow_factors(df: pd.DataFrame) -> pd.DataFrame:
     out["fcf_rating"] = rating_vals
     out["real_fcf_ttm"] = real_fcf_ttm_vals
     out["drop_ratio"] = drop_ratio_vals
+
+    # B27 → B32-UI: sustainable_return_rate = (capped_fy_div + real_buyback) / current_price - dilution
+    # 封顶：fy_div_per_share 不得超过 (3y real_fcf + 净现金 × 10%) / 股本
+    #   含义：3 年真 FCF 是可持续来源；净现金按 10% 折现/年化补贴 = 用现金垫付 10 年的容忍度
+    # 负值 → 0（直接砍光分红）；金融行业 / 3y OCF 缺失 → 回退到 return_rate
+    ind = out.get("industry").astype(str) if "industry" in out.columns else pd.Series("", index=out.index)
+    fin_exempt = ind.isin(_FIN_INDUSTRY_EXEMPT)
+    rfcf_abs = pd.to_numeric(out["real_fcf"], errors="coerce")          # 绝对值（3y 平均）
+    net_cash_abs = cash_s.fillna(0) - ibd_s.fillna(0)                    # 绝对值
+    cap_total = rfcf_abs + net_cash_abs * 0.1                            # 可分配总额（绝对）
+    cap_per_share = cap_total / shs.where(shs > 0)
+    cap = cap_per_share.clip(lower=0)                                    # 负 → 0
+    fy_div_ps = pd.to_numeric(out.get("fy_div_per_share"), errors="coerce").fillna(0)
+    capped_fy_div = pd.concat([fy_div_ps, cap], axis=1).min(axis=1)
+    rb = pd.to_numeric(out.get("real_buyback_per_share"), errors="coerce").fillna(0)
+    cp_for_sust = pd.to_numeric(out.get("current_price"), errors="coerce")
+    dil = pd.to_numeric(out.get("annual_dilution_rate"), errors="coerce").fillna(0)
+    sust = (capped_fy_div + rb) / cp_for_sust.where(cp_for_sust > 0) * 100 - dil * 100
+    # 豁免回退到 return_rate
+    ret = pd.to_numeric(out.get("return_rate"), errors="coerce")
+    sust = sust.where(rfcf_abs.notna() & ~fin_exempt, ret)
+    out["sustainable_return_rate"] = sust.round(4)
+
+    # B28: 让 sustainable_return_rate 紧跟 return_rate 显示
+    if "return_rate" in out.columns:
+        cols = list(out.columns)
+        if "sustainable_return_rate" in cols:
+            cols.remove("sustainable_return_rate")
+            idx = cols.index("return_rate") + 1
+            cols.insert(idx, "sustainable_return_rate")
+            out = out[cols]
 
     # B32: DCC 用 real_fcf 替代 OCF（标普 FCF/Div 口径，更严格）
     real_fcf_series = pd.to_numeric(out["real_fcf"], errors="coerce")
