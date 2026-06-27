@@ -412,16 +412,23 @@ def _apply_filters(df: pd.DataFrame, filter_div_growth: bool, filter_return_grow
         if nsc is not None:
             out = out[nsc.fillna(0) >= 0]
     if filter_revenue:
-        # TTM 营收同比 >= -0.10（下降不超过 10%）；空值视作不通过过滤
+        # TTM 营收同比 >= -0.10（下降不超过 10%）；现金堡垒豁免放宽到 -0.30
         ry = out.get("revenue_yoy")
         if ry is not None:
-            out = out[pd.to_numeric(ry, errors="coerce") >= -0.10]
+            ryn = pd.to_numeric(ry, errors="coerce")
+            cf_col = cash_fortress_col.reindex(out.index).fillna(False)
+            threshold = pd.Series(-0.10, index=out.index)
+            threshold[cf_col] = -0.30
+            out = out[ryn >= threshold]
     if filter_ocf:
-        # 经营现金流 TTM 同比 >= -0.50（减少不超过 50%）；空值剔除
+        # 经营现金流 TTM 同比 >= -0.50（减少不超过 50%）；现金堡垒豁免放宽到 -0.80；空值剔除
         cf = out.get("operating_cashflow_yoy")
         if cf is not None:
             cfn = pd.to_numeric(cf, errors="coerce")
-            out = out[cfn.notna() & (cfn >= -0.50)]
+            cf_col = cash_fortress_col.reindex(out.index).fillna(False)
+            threshold = pd.Series(-0.50, index=out.index)
+            threshold[cf_col] = -0.80
+            out = out[cfn.notna() & (cfn >= threshold)]
     if filter_net_debt_hard:
         # B24: 改用 debt_to_equity（有息负债/净资产）≤ 0.70；NaN 保留
         # B31: 现金堡垒豁免

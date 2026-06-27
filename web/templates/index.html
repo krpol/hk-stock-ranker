@@ -68,11 +68,11 @@
             <input type="checkbox" name="frb" value="1" onchange="this.form.submit()" {% if filter_real_buyback %}checked{% endif %}>
             真实回购
         </label>
-        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="保留 TTM营收同比 ≥ -10%（下降不超过 10%；空值被剔除）">
+        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="保留 TTM营收同比 ≥ -10%（下降不超过 10%；空值被剔除）&#10;现金堡垒公司放宽到 ≥ -30%">
             <input type="checkbox" name="frv" value="1" onchange="this.form.submit()" {% if filter_revenue %}checked{% endif %}>
             营收降幅≤10%
         </label>
-        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="保留 经营现金流 TTM 同比 ≥ -50%（减少不超过 50%；空值被剔除）">
+        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="保留 经营现金流 TTM 同比 ≥ -50%（减少不超过 50%；空值被剔除）&#10;现金堡垒公司放宽到 ≥ -80%">
             <input type="checkbox" name="focf" value="1" onchange="this.form.submit()" {% if filter_ocf %}checked{% endif %}>
             现金流降幅≤50%
         </label>
