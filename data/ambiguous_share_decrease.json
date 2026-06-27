@@ -1,0 +1,322 @@
+[
+  {
+    "code": "00038",
+    "name": "第一拖拉机股份",
+    "max_decrease_pct": "44%"
+  },
+  {
+    "code": "00085",
+    "name": "中电华大科技",
+    "max_decrease_pct": "13%"
+  },
+  {
+    "code": "00087",
+    "name": "太古股份公司Ｂ",
+    "max_decrease_pct": "53%"
+  },
+  {
+    "code": "00107",
+    "name": "四川成渝高速公路",
+    "max_decrease_pct": "30%"
+  },
+  {
+    "code": "00189",
+    "name": "东岳集团",
+    "max_decrease_pct": "28%"
+  },
+  {
+    "code": "00320",
+    "name": "金宝通",
+    "max_decrease_pct": "11%"
+  },
+  {
+    "code": "00354",
+    "name": "中国软件国际",
+    "max_decrease_pct": "19%"
+  },
+  {
+    "code": "00522",
+    "name": "ASMPT",
+    "max_decrease_pct": "11%"
+  },
+  {
+    "code": "00538",
+    "name": "味千（中国）",
+    "max_decrease_pct": "11%"
+  },
+  {
+    "code": "00640",
+    "name": "星谦发展",
+    "max_decrease_pct": "50%"
+  },
+  {
+    "code": "00685",
+    "name": "世界华文媒体",
+    "max_decrease_pct": "25%"
+  },
+  {
+    "code": "00751",
+    "name": "创维集团",
+    "max_decrease_pct": "19%"
+  },
+  {
+    "code": "00799",
+    "name": "IGG",
+    "max_decrease_pct": "15%"
+  },
+  {
+    "code": "00867",
+    "name": "康哲药业",
+    "max_decrease_pct": "35%"
+  },
+  {
+    "code": "00956",
+    "name": "新天绿色能源",
+    "max_decrease_pct": "34%"
+  },
+  {
+    "code": "01268",
+    "name": "美东汽车",
+    "max_decrease_pct": "13%"
+  },
+  {
+    "code": "01289",
+    "name": "盛力达科技",
+    "max_decrease_pct": "24%"
+  },
+  {
+    "code": "01407",
+    "name": "交运燃气",
+    "max_decrease_pct": "16%"
+  },
+  {
+    "code": "01458",
+    "name": "周黑鸭",
+    "max_decrease_pct": "12%"
+  },
+  {
+    "code": "01461",
+    "name": "中泰期货",
+    "max_decrease_pct": "10%"
+  },
+  {
+    "code": "01576",
+    "name": "齐鲁高速",
+    "max_decrease_pct": "45%"
+  },
+  {
+    "code": "01637",
+    "name": "顺兴集团控股",
+    "max_decrease_pct": "15%"
+  },
+  {
+    "code": "01698",
+    "name": "腾讯音乐－ＳＷ",
+    "max_decrease_pct": "12%"
+  },
+  {
+    "code": "01752",
+    "name": "澳洲成峰高教",
+    "max_decrease_pct": "12%"
+  },
+  {
+    "code": "01795",
+    "name": "亚东集团",
+    "max_decrease_pct": "16%"
+  },
+  {
+    "code": "01800",
+    "name": "中国交通建设",
+    "max_decrease_pct": "43%"
+  },
+  {
+    "code": "01905",
+    "name": "海通恒信",
+    "max_decrease_pct": "15%"
+  },
+  {
+    "code": "01930",
+    "name": "勋龙",
+    "max_decrease_pct": "12%"
+  },
+  {
+    "code": "01980",
+    "name": "天鸽互动",
+    "max_decrease_pct": "11%"
+  },
+  {
+    "code": "02018",
+    "name": "瑞声科技",
+    "max_decrease_pct": "11%"
+  },
+  {
+    "code": "02076",
+    "name": "ＢＯＳＳ直聘－Ｗ",
+    "max_decrease_pct": "46%"
+  },
+  {
+    "code": "02176",
+    "name": "赛迪顾问",
+    "max_decrease_pct": "15%"
+  },
+  {
+    "code": "02210",
+    "name": "京城佳业",
+    "max_decrease_pct": "43%"
+  },
+  {
+    "code": "02245",
+    "name": "力勤资源",
+    "max_decrease_pct": "46%"
+  },
+  {
+    "code": "02273",
+    "name": "固生堂",
+    "max_decrease_pct": "17%"
+  },
+  {
+    "code": "02285",
+    "name": "泉峰控股",
+    "max_decrease_pct": "16%"
+  },
+  {
+    "code": "02377",
+    "name": "博奇环保",
+    "max_decrease_pct": "17%"
+  },
+  {
+    "code": "02382",
+    "name": "舜宇光学科技",
+    "max_decrease_pct": "12%"
+  },
+  {
+    "code": "02415",
+    "name": "梅斯健康",
+    "max_decrease_pct": "12%"
+  },
+  {
+    "code": "02488",
+    "name": "元征科技",
+    "max_decrease_pct": "11%"
+  },
+  {
+    "code": "02517",
+    "name": "锅圈",
+    "max_decrease_pct": "11%"
+  },
+  {
+    "code": "02600",
+    "name": "中国铝业",
+    "max_decrease_pct": "35%"
+  },
+  {
+    "code": "02601",
+    "name": "中国太保",
+    "max_decrease_pct": "27%"
+  },
+  {
+    "code": "02602",
+    "name": "万物云",
+    "max_decrease_pct": "47%"
+  },
+  {
+    "code": "02698",
+    "name": "乐舒适",
+    "max_decrease_pct": "49%"
+  },
+  {
+    "code": "02877",
+    "name": "神威药业",
+    "max_decrease_pct": "12%"
+  },
+  {
+    "code": "02888",
+    "name": "渣打集团",
+    "max_decrease_pct": "11%"
+  },
+  {
+    "code": "03323",
+    "name": "中国建材",
+    "max_decrease_pct": "10%"
+  },
+  {
+    "code": "03337",
+    "name": "安东油田服务",
+    "max_decrease_pct": "11%"
+  },
+  {
+    "code": "03348",
+    "name": "中国鹏飞集团",
+    "max_decrease_pct": "12%"
+  },
+  {
+    "code": "03606",
+    "name": "福耀玻璃",
+    "max_decrease_pct": "15%"
+  },
+  {
+    "code": "03660",
+    "name": "奇富科技－Ｓ",
+    "max_decrease_pct": "22%"
+  },
+  {
+    "code": "03993",
+    "name": "洛阳钼业",
+    "max_decrease_pct": "24%"
+  },
+  {
+    "code": "06117",
+    "name": "日照港裕廊",
+    "max_decrease_pct": "14%"
+  },
+  {
+    "code": "06198",
+    "name": "青岛港",
+    "max_decrease_pct": "35%"
+  },
+  {
+    "code": "06655",
+    "name": "华新建材",
+    "max_decrease_pct": "33%"
+  },
+  {
+    "code": "06808",
+    "name": "高鑫零售",
+    "max_decrease_pct": "16%"
+  },
+  {
+    "code": "06909",
+    "name": "百得利控股",
+    "max_decrease_pct": "10%"
+  },
+  {
+    "code": "06936",
+    "name": "顺丰控股",
+    "max_decrease_pct": "21%"
+  },
+  {
+    "code": "06959",
+    "name": "长久股份",
+    "max_decrease_pct": "12%"
+  },
+  {
+    "code": "09618",
+    "name": "京东集团－ＳＷ",
+    "max_decrease_pct": "15%"
+  },
+  {
+    "code": "09636",
+    "name": "九方智投控股",
+    "max_decrease_pct": "11%"
+  },
+  {
+    "code": "09879",
+    "name": "米高集团",
+    "max_decrease_pct": "22%"
+  },
+  {
+    "code": "09987",
+    "name": "百胜中国",
+    "max_decrease_pct": "11%"
+  }
+]

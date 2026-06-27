@@ -1,0 +1,4225 @@
+{
+  "00016": [
+    "debt"
+  ],
+  "00659": [
+    "debt"
+  ],
+  "00667": [
+    "debt"
+  ],
+  "00728": [
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00763": [
+    "buyback"
+  ],
+  "00771": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00777": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00780": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00788": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00798": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00799": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00806": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00807": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00811": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00816": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00817": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00819": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00826": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00829": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00830": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00831": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00833": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00836": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00837": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00838": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00839": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00842": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00855": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00856": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00857": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00861": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00866": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00867": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00868": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00869": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00874": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00878": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00881": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00882": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00883": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00887": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00894": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00898": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00900": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00902": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00909": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00914": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00916": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00921": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00922": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00927": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00933": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00934": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00939": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00941": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00945": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00950": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00951": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00956": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00960": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00966": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00968": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00987": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00991": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00992": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00995": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00998": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "00999": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01001": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01005": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01008": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01023": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01024": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01036": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01038": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01044": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01045": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01050": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01051": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01052": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01057": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01061": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01065": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01066": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01070": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01071": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01072": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01083": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01084": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01086": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01088": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01093": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01099": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01100": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01104": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01109": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01110": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01112": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01113": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01114": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01117": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01118": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01123": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01126": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01127": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01128": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01138": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01148": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01157": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01161": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01164": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01170": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01177": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01180": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01181": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01184": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01186": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01193": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01199": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01203": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01205": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01209": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01211": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01213": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01216": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01223": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01234": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01245": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01257": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01258": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01268": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01270": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01272": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01273": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01276": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01277": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01283": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01284": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01285": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01286": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01288": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01289": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01292": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01299": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01308": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01310": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01313": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01314": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01316": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01318": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01319": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01330": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01334": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01336": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01339": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01345": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01346": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01349": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01357": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01358": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01359": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01361": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01364": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01368": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01373": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01375": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01378": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01382": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01385": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01397": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01398": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01407": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01408": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01412": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01418": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01419": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01425": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01428": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01432": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01443": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01447": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01451": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01455": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01456": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01458": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01460": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01461": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01471": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01473": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01475": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01476": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01478": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01480": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01496": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01502": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01508": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01513": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01515": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01516": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01518": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01522": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01523": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01525": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01526": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01530": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01538": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01540": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01543": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01547": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01553": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01556": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01568": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01569": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01571": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01576": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01578": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01579": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01582": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01585": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01587": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01588": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01596": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01599": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01600": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01601": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01606": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01612": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01618": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01626": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01627": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01635": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01637": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01650": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01651": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01662": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01666": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01669": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01671": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01675": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01681": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01685": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01686": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01690": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01692": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01696": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01698": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01705": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01709": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01710": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01713": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01717": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01729": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01731": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01733": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01739": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01747": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01749": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01752": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01760": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01763": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01766": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01767": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01769": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01773": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01776": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01780": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01785": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01786": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01787": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01788": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01789": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01793": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01795": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01798": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01800": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01809": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01811": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01816": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01818": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01820": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01830": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01836": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01837": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01846": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01848": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01853": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01857": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01861": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01866": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01876": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01882": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01883": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01888": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01890": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01895": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01896": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01897": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01898": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01905": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01907": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01910": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01913": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01916": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01919": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01925": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01928": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01929": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01930": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01948": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01953": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01955": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01958": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01962": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01969": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01972": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01975": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01977": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01978": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01979": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01980": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01981": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01982": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01985": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01986": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01987": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01995": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01997": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "01999": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02003": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02005": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02009": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02016": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02018": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02020": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02025": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02030": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02031": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02033": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02039": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02050": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02057": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02076": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02096": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02099": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02100": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02101": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02102": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02111": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02116": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02119": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02120": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02128": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02136": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02138": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02145": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02155": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02156": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02161": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02166": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02172": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02176": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02177": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02180": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02189": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02190": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02192": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02196": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02198": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02199": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02205": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02208": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02209": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02210": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02218": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02219": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02230": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02232": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02233": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02238": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02239": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02245": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02260": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02266": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02271": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02273": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02279": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02281": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02282": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02283": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02285": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02289": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02291": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02293": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02295": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02298": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02299": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02307": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02313": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02314": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02317": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02318": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02319": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02321": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02325": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02327": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02328": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02331": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02333": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02337": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02338": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02343": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02347": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02348": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02355": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02356": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02357": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02360": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02367": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02368": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02373": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02376": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02377": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02378": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02380": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02381": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02382": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02386": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02388": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02391": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02407": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02415": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02420": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02421": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02423": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02427": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02460": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02481": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02483": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02488": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02489": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02490": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02505": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02507": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02510": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02517": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02518": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02529": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02530": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02536": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02539": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02543": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02546": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02549": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02551": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02555": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02560": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02585": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02588": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02589": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02600": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02601": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02602": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02603": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02607": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02610": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02611": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02628": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02633": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02638": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02648": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02651": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02657": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02660": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02663": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02666": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02669": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02671": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02678": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02682": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02683": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02688": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02693": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02695": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02698": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02714": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02722": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02788": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02789": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02798": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02858": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02866": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02869": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02877": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02880": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02881": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02883": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02885": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02886": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02888": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "02899": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03200": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03288": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03296": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03303": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03306": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03309": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03311": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03315": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03316": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03319": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03320": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03323": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03328": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03330": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03337": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03339": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03348": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03368": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03369": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03382": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03393": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03399": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03600": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03606": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03613": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03618": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03633": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03658": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03660": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03668": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03669": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03678": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03686": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03692": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03698": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03699": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03709": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03718": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03737": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03750": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03788": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03808": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03813": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03816": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03818": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03828": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03833": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03836": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03838": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03848": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03860": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03868": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03877": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03886": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03888": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03898": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03899": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03900": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03918": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03933": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03958": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03968": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03969": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03978": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03983": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03986": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03988": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03990": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03991": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03993": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03997": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "03998": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06030": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06033": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06038": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06049": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06055": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06066": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06069": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06083": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06098": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06099": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06110": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06113": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06117": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06123": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06166": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06168": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06178": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06181": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06186": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06196": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06198": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06199": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06601": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06603": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06613": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06626": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06655": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06663": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06668": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06677": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06686": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06690": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06693": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06699": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06805": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06806": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06808": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06811": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06818": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06820": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06823": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06830": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06831": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06833": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06838": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06858": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06862": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06866": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06868": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06869": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06882": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06886": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06889": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06896": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06898": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06909": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06913": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06919": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06929": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06936": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06939": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06959": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06963": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06969": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06979": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06989": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "06993": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "08023": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "08033": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "08049": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "08062": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "08092": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "08188": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "08371": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "08372": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "08411": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "08426": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "08439": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "08473": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "08483": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "08529": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "08540": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "08601": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "08629": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "08635": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "09611": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "09616": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "09618": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "09633": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "09636": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "09638": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "09676": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "09869": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "09876": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "09879": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "09885": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "09889": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "09893": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "09896": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "09898": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "09901": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "09908": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "09919": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "09922": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "09927": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "09928": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "09930": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "09936": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "09959": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "09960": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "09973": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "09979": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "09980": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "09983": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "09985": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "09987": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "09988": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "09992": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "09998": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "09999": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "80016": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "80291": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "80388": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "80700": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "80883": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "80941": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "80992": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "81024": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "81299": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "82020": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "82318": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "82331": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "82388": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ],
+  "89618": [
+    "dividend",
+    "buyback",
+    "debt",
+    "growth"
+  ]
+}

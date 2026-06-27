@@ -1,0 +1,1 @@
+cd /Users/huangzhen/hk-stock-ranker && source .venv/bin/activate && python main.py --web

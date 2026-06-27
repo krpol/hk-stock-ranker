@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>港股回报率排名</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; background: #f4f6f9; color: #333; }
+        header { background: #1a2744; color: white; padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; }
+        header h1 { font-size: 1.3rem; font-weight: 600; }
+        .subtitle { font-size: 0.8rem; opacity: 0.7; margin-top: 2px; }
+        .controls { background: white; padding: 12px 24px; border-bottom: 1px solid #e0e4ea; display: flex; gap: 16px; align-items: center; flex-wrap: wrap; }
+        select, button { padding: 7px 14px; border-radius: 6px; border: 1px solid #ccc; font-size: 0.9rem; }
+        button { background: #1a6cf7; color: white; border: none; cursor: pointer; font-weight: 500; }
+        button:hover { background: #0f56d4; }
+        .btn-dl { background: #17a34a; }
+        .btn-dl:hover { background: #138a3f; }
+        .summary { padding: 10px 24px; font-size: 0.85rem; color: #666; background: #f9fafb; border-bottom: 1px solid #e8eaf0; }
+        .table-wrap { overflow-x: auto; padding: 16px 24px; }
+        table { width: 100%; border-collapse: collapse; background: white; border-radius: 8px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.08); font-size: 0.88rem; }
+        thead { background: #1a2744; color: white; }
+        thead th { padding: 11px 12px; text-align: left; font-weight: 500; white-space: nowrap; }
+        tbody tr:nth-child(even) { background: #f8f9fc; }
+        tbody tr:hover { background: #eef2ff; }
+        tbody td { padding: 9px 12px; white-space: nowrap; border-bottom: 1px solid #f0f2f6; }
+        .rank-1 { color: #d4880a; font-weight: 700; }
+        .rank-2 { color: #888; font-weight: 700; }
+        .rank-3 { color: #c0762b; font-weight: 700; }
+        .high-yield { color: #15803d; font-weight: 600; }
+        .mid-yield  { color: #0e6aad; }
+        .low-yield  { color: #666; }
+        .pagination { display: flex; gap: 8px; justify-content: center; padding: 16px 24px; align-items: center; }
+        .pagination a { padding: 6px 14px; border-radius: 5px; border: 1px solid #ccc; text-decoration: none; color: #333; font-size: 0.88rem; }
+        .pagination a.active { background: #1a6cf7; color: white; border-color: #1a6cf7; }
+        .pagination a:hover:not(.active) { background: #eef; }
+        .no-data { text-align: center; padding: 60px; color: #999; font-size: 1rem; }
+        @media (max-width: 600px) { header { flex-direction: column; gap: 8px; } }
+    </style>
+</head>
+<body>
+
+<header>
+    <div>
+        <h1>🇭🇰 港股回报率排名</h1>
+        <div class="subtitle">回报率 = (财年分红 + 预分红 + 财年回购) / 当前收盘价</div>
+    </div>
+    <div style="font-size:0.8rem;opacity:0.7;">数据来源：AKShare · Yahoo Finance &nbsp;|&nbsp; <a href="/backtest" style="color:#9bc2ff;text-decoration:none;font-weight:600;">📊 回测</a></div>
+</header>
+
+<div class="controls">
+    <form method="get" style="display:flex;gap:14px;align-items:center;flex-wrap:wrap;">
+        <label style="font-size:0.9rem;">选择期间：</label>
+        <select name="period" onchange="this.form.submit()">
+            {% for p in periods %}
+            <option value="{{ p }}" {% if p == selected_period %}selected{% endif %}>{{ p }}</option>
+            {% endfor %}
+        </select>
+        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="保留 TTM分红 ≥ 上年TTM分红 或 最近期分红 ≥ 同期上年分红（任一不降即保留；两项都下降才剔除）">
+            <input type="checkbox" name="fdg" value="1" onchange="this.form.submit()" {% if filter_div_growth %}checked{% endif %}>
+            分红同比不下降
+        </label>
+        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="剩 TTM回报 ≥ 上年TTM回报">
+            <input type="checkbox" name="frg" value="1" onchange="this.form.submit()" {% if filter_return_growth %}checked{% endif %}>
+            回报同比不下降
+        </label>
+        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="剩股本净变化 ≥ 0（排除被 SBC 增发抵消的伪回购）">
+            <input type="checkbox" name="frb" value="1" onchange="this.form.submit()" {% if filter_real_buyback %}checked{% endif %}>
+            真实回购
+        </label>
+        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="保留 TTM营收同比 ≥ -10%（下降不超过 10%；空值被剔除）">
+            <input type="checkbox" name="frv" value="1" onchange="this.form.submit()" {% if filter_revenue %}checked{% endif %}>
+            营收降幅≤10%
+        </label>
+        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="保留 经营现金流 TTM 同比 ≥ -50%（减少不超过 50%；空值被剔除）">
+            <input type="checkbox" name="focf" value="1" onchange="this.form.submit()" {% if filter_ocf %}checked{% endif %}>
+            现金流降幅≤50%
+        </label>
+        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="剔除 成长因子(growth_factor) < -0.35（加权 zscore 复合得分：revenue/operating_income/operating_cashflow 权重 1，ttm_return 权重 2；NaN 保留）">
+            <input type="checkbox" name="fgf" value="1" onchange="this.form.submit()" {% if filter_growth_factor %}checked{% endif %}>
+            成长因子 ≥ -0.35
+        </label>
+        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="剔除 ROE 横截面 z<-1.8（ROE 显著低于均值 1.8σ）；NaN 保留">
+            <input type="checkbox" name="froez" value="1" onchange="this.form.submit()" {% if filter_roe_z %}checked{% endif %}>
+            ROE z≥-1.8
+        </label>
+        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="剔除 近 1 年换手率横截面 z>3.6（过热投机盘；turnover_12m=近 365 天 volume 合计 / shares_outstanding）；NaN 保留">
+            <input type="checkbox" name="ftoz" value="1" onchange="this.form.submit()" {% if filter_turnover_z %}checked{% endif %}>
+            换手率 z≤3.6
+        </label>
+        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="保留 有息负债/净资产 (debt_to_equity) ≤ 70%（硬阈值）；空值保留">
+            <input type="checkbox" name="fnd" value="1" onchange="this.form.submit()" {% if filter_net_debt_hard %}checked{% endif %}>
+            有息负债/净资产≤70%
+        </label>
+        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="剔除 有息负债/净资产 (debt_to_equity) 横截面 z>1.2（杠杆显著高于均值 1.2σ）；空值保留">
+            <input type="checkbox" name="fndz" value="1" onchange="this.form.submit()" {% if filter_net_debt_z %}checked{% endif %}>
+            有息负债/净资产 z>1.2 剔除
+        </label>
+        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="保留 现金转化率 (3 年平均 OCF / 3 年平均营业利润) ≥ 0.5；银行/保险/其他金融/投资公司豁免；空值保留">
+            <input type="checkbox" name="fcc" value="1" onchange="this.form.submit()" {% if filter_cash_conversion %}checked{% endif %}>
+            现金转化率≥0.5
+        </label>
+        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="保留 分红现金覆盖率 (3 年平均 OCF / 3 年平均现金分红总额) ≥ 1.0；或 现金堡垒豁免（现金 − 有息负债 − 3×当年总分红 > 市值）；非派息股保留；银行/保险等金融行业豁免">
+            <input type="checkbox" name="fdcc" value="1" onchange="this.form.submit()" {% if filter_dividend_coverage %}checked{% endif %}>
+            分红现金覆盖≥1
+        </label>
+        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="B31: 剩余可用现金流偿债覆盖率 ≥ 5%&#10;  剩余 CF = 3y平均OCF − min(3y平均CapEx + 期初一年内到期租赁, 3y平均D&A)&#10;  ε = max(净资产 × 1%, 1亿)&#10;  覆盖率 = 剩余CF / max(IBD−Cash, ε)&#10;  剔除 fcf_rating==DROP (real_fcf<0 或 覆盖率<5%)&#10;  现金堡垒（cash−ibd−3×div > 市值）自动豁免，评级 AAA;&#10;  评级为 N/A 的（数据缺失）保留">
+            <input type="checkbox" name="frfc" value="1" onchange="this.form.submit()" {% if filter_real_fcf_coverage %}checked{% endif %}>
+            剩余CF/净债≥5%
+        </label>
+        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="动量过滤（3 条任一命中即剔除）：&#10;  - 加权动量因子 mom_factor > 2&#10;  - 6 月动量 z_mom6 < -3 （6月深跌）&#10;  - 1 月动量 z_mom1 > 2.0 （1月过热）&#10;加权公式：mom_factor=(1·z1+2·z3+1·z6+1·z9)/5">
+            <input type="checkbox" name="fmom" value="1" onchange="this.form.submit()" {% if filter_momentum %}checked{% endif %}>
+            动量过滤
+        </label>
+        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="保留 当前股价 ≤ 3 年(36个月)最低收盘价 × 3（避免追高；空价被剔除）">
+            <input type="checkbox" name="f3l" value="1" onchange="this.form.submit()" {% if filter_price_3y_low_3x %}checked{% endif %}>
+            股价≤3年低点×3
+        </label>
+        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="保留 当前股价 ≤ 6 个月最低收盘价 × 1.6">
+            <input type="checkbox" name="f6l" value="1" onchange="this.form.submit()" {% if filter_price_6m_low_18x %}checked{% endif %}>
+            股价≤6月低点×1.6
+        </label>
+        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="保留 当前股价 ≤ 2 个月最低收盘价 × 1.25">
+            <input type="checkbox" name="f2l" value="1" onchange="this.form.submit()" {% if filter_price_2m_low_13x %}checked{% endif %}>
+            股价≤2月低点×1.25
+        </label>
+        <label style="font-size:0.88rem;display:flex;align-items:center;gap:6px;margin-left:8px;" title="表格排序键">
+            排序：
+            <select name="sort" onchange="this.form.submit()" style="font-size:0.88rem;padding:2px 4px;">
+                <option value="composite" {% if sort_by == 'composite' %}selected{% endif %}>综合得分</option>
+                <option value="return" {% if sort_by == 'return' %}selected{% endif %}>原始回报率</option>
+                <option value="sustainable" {% if sort_by == 'sustainable' %}selected{% endif %}>可持续回报率</option>
+            </select>
+        </label>
+        <input type="hidden" name="per_page" value="{{ per_page }}">
+    </form>
+    {% if selected_period %}
+    <a href="/download/{{ selected_period }}">
+        <button class="btn-dl">⬇ 下载 Excel</button>
+    </a>
+    {% endif %}
+</div>
+
+{% if total > 0 %}
+<div class="summary">
+    共 <strong>{{ total }}</strong> 只股票
+    {% if total_unfiltered and total_unfiltered != total %}
+    <span style="color:#888">(从 {{ total_unfiltered }} 只中筛选)</span>
+    {% endif %}
+     · 当前显示第 {{ (page-1)*per_page+1 }}–{{ [page*per_page, total]|min }} 名
+    · 期间：<strong>{{ selected_period }}</strong>
+</div>
+
+<div class="table-wrap">
+<table>
+    <thead>
+        <tr>
+            {% for col in columns %}
+            <th>{{ col }}</th>
+            {% endfor %}
+        </tr>
+    </thead>
+    <tbody>
+        {% for row in table %}
+        <tr>
+            {% for col in columns %}
+            {% set val = row[col] %}
+            {% if col == "排名" %}
+                <td class="{% if val == 1 %}rank-1{% elif val == 2 %}rank-2{% elif val == 3 %}rank-3{% endif %}">{{ val }}</td>
+            {% elif col == "回报率(%)" %}
+                {% if val is not none and val >= 8 %}
+                    <td class="high-yield">{{ "%.2f"|format(val) }}%</td>
+                {% elif val is not none and val >= 3 %}
+                    <td class="mid-yield">{{ "%.2f"|format(val) }}%</td>
+                {% else %}
+                    <td class="low-yield">{{ "%.2f"|format(val) if val is not none else "—" }}%</td>
+                {% endif %}
+            {% elif val is number %}
+                <td>{{ "%.4f"|format(val) if val is not none else "—" }}</td>
+            {% else %}
+                <td>{{ val if val is not none else "—" }}</td>
+            {% endif %}
+            {% endfor %}
+        </tr>
+        {% endfor %}
+    </tbody>
+</table>
+</div>
+
+{%- set qs = '&per_page=' ~ per_page ~ ('&fdg=1' if filter_div_growth else '') ~ ('&frg=1' if filter_return_growth else '') ~ ('&frb=1' if filter_real_buyback else '') ~ ('&frv=1' if filter_revenue else '') ~ ('&f3l=1' if filter_price_3y_low_3x else '') ~ ('&f6l=1' if filter_price_6m_low_18x else '') ~ ('&f2l=1' if filter_price_2m_low_13x else '') ~ ('&focf=1' if filter_ocf else '') ~ ('&fmom=1' if filter_momentum else '') ~ ('&fnd=1' if filter_net_debt_hard else '') ~ ('&fndz=1' if filter_net_debt_z else '') ~ ('&fgf=1' if filter_growth_factor else '') ~ ('&froez=1' if filter_roe_z else '') ~ ('&ftoz=1' if filter_turnover_z else '') ~ ('&fcc=1' if filter_cash_conversion else '') ~ ('&fdcc=1' if filter_dividend_coverage else '') ~ ('&frfc=1' if filter_real_fcf_coverage else '') ~ (('&sort=' ~ sort_by) if sort_by and sort_by != 'composite' else '') -%}
+<div class="pagination">
+    {% if page > 1 %}
+    <a href="?period={{ selected_period }}&page={{ page-1 }}{{ qs }}">« 上一页</a>
+    {% endif %}
+    {% for p in range([1, page-2]|max, [total_pages+1, page+3]|min) %}
+    <a href="?period={{ selected_period }}&page={{ p }}{{ qs }}" class="{{ 'active' if p == page else '' }}">{{ p }}</a>
+    {% endfor %}
+    {% if page < total_pages %}
+    <a href="?period={{ selected_period }}&page={{ page+1 }}{{ qs }}">下一页 »</a>
+    {% endif %}
+</div>
+
+{% else %}
+<div class="no-data">
+    暂无数据。请先运行 <code>python main.py --update</code> 采集数据。
+</div>
+{% endif %}
+
+</body>
+</html>

@@ -1,0 +1,337 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>港股 量化回测 | HK Stock Ranker</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", sans-serif; background: #f4f6f9; color: #333; }
+  header { background: #1a2744; color: white; padding: 16px 24px; display: flex; justify-content: space-between; align-items: center; }
+  header h1 { font-size: 1.3rem; font-weight: 600; }
+  header .nav a { color: #9bc2ff; margin-left: 16px; text-decoration: none; font-size: 0.9rem; }
+  header .nav a:hover { color: white; }
+
+  .container { padding: 16px 24px; }
+  .panel { background: white; border-radius: 10px; padding: 18px 22px; margin-bottom: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+  .panel h2 { font-size: 1.05rem; margin-bottom: 14px; padding-bottom: 8px; border-bottom: 2px solid #e8eaf0; color: #1a2744; }
+
+  .form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px; align-items: end; }
+  .form-grid label { font-size: 0.78rem; color: #666; display: block; margin-bottom: 4px; }
+  .form-grid input, .form-grid select { width: 100%; padding: 7px 10px; border: 1px solid #ccc; border-radius: 5px; font-size: 0.9rem; }
+  .btn { padding: 8px 18px; border-radius: 6px; border: none; background: #1a6cf7; color: white; cursor: pointer; font-weight: 500; font-size: 0.9rem; }
+  .btn:hover { background: #0f56d4; }
+  .btn:disabled { background: #aac; cursor: not-allowed; }
+  .btn-q { background: #c66ed3; }
+  .btn-q:hover { background: #a44ab0; }
+  .btn-row { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; }
+
+  .summary-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 14px; margin-bottom: 16px; }
+  .metric { background: #f8f9fc; padding: 12px 14px; border-radius: 7px; border-left: 4px solid #1a6cf7; }
+  .metric .label { font-size: 0.75rem; color: #666; }
+  .metric .value { font-size: 1.25rem; font-weight: 700; color: #1a2744; margin-top: 2px; }
+  .metric .value.pos { color: #15803d; }
+  .metric .value.neg { color: #d33; }
+
+  .chart-wrap { position: relative; height: 360px; }
+  .chart-wrap.small { height: 280px; }
+
+  table.q-table { width: 100%; border-collapse: collapse; font-size: 0.88rem; margin-top: 10px; }
+  table.q-table thead { background: #1a2744; color: white; }
+  table.q-table th, table.q-table td { padding: 8px 12px; text-align: left; border-bottom: 1px solid #f0f2f6; }
+  table.q-table tbody tr:nth-child(even) { background: #f8f9fc; }
+
+  .loading { text-align: center; color: #888; padding: 24px; font-style: italic; }
+  .error { background: #fee; color: #c33; padding: 12px; border-radius: 6px; margin-top: 10px; font-size: 0.9rem; }
+  .hidden { display: none; }
+  .note { background: #fff8e1; padding: 10px 14px; border-radius: 6px; font-size: 0.82rem; color: #855; margin-bottom: 14px; border-left: 4px solid #f0a020; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>📊 量化回测系统</h1>
+    <div style="font-size:0.78rem;opacity:0.7;margin-top:2px;">月度调仓 · TOP-N 主策略 · 五分位单调性检验</div>
+  </div>
+  <div class="nav">
+    <a href="/">← 排名首页</a>
+  </div>
+</header>
+
+<div class="container">
+
+  <div class="note">
+    ⚠️ 偏差说明：当前历史 ranking 由"今日财务因子 + 历史月底价"回填生成（前瞻偏差 + 幸存者偏差），仅供策略框架验证。请在真实 ranking 累积满 24 月后再用于策略评估。
+  </div>
+
+  <div class="panel">
+    <h2>回测参数</h2>
+    <div class="form-grid">
+      <div>
+        <label>开始月（YYYY-MM）</label>
+        <select id="start">
+          {% for p in periods %}<option value="{{ p }}">{{ p }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label>结束月（YYYY-MM）</label>
+        <select id="end">
+          {% for p in periods %}<option value="{{ p }}" {% if loop.last %}selected{% endif %}>{{ p }}</option>{% endfor %}
+        </select>
+      </div>
+      <div>
+        <label>TOP N</label>
+        <input id="topn" type="number" value="20" min="1" max="100">
+      </div>
+      <div>
+        <label>权重方案</label>
+        <select id="weight">
+          <option value="equal" selected>equal（等权）</option>
+          <option value="score">score（按分数）</option>
+          <option value="rank">rank（按倒数）</option>
+        </select>
+      </div>
+      <div>
+        <label>单边成本（bps）</label>
+        <input id="cost" type="number" value="15" min="0" max="100">
+      </div>
+      <div>
+        <label>分位数</label>
+        <input id="nq" type="number" value="5" min="2" max="10">
+      </div>
+    </div>
+    <div class="btn-row">
+      <button class="btn" id="btn-topn">🚀 跑 TOP-N 回测</button>
+      <button class="btn btn-q" id="btn-quintile">📊 跑五分位回测</button>
+      <span id="status" style="align-self:center;color:#888;font-size:0.86rem;"></span>
+    </div>
+    <div id="error-box" class="error hidden"></div>
+  </div>
+
+  <!-- TOP-N 结果 -->
+  <div id="topn-result" class="hidden">
+    <div class="panel">
+      <h2>TOP-N 策略表现</h2>
+      <div class="summary-grid" id="topn-metrics"></div>
+      <div class="chart-wrap"><canvas id="navChart"></canvas></div>
+    </div>
+    <div class="panel">
+      <h2>月度收益分布</h2>
+      <div class="chart-wrap small"><canvas id="retChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- 五分位结果 -->
+  <div id="quintile-result" class="hidden">
+    <div class="panel">
+      <h2>五分位 NAV 对比 <span id="spearman-tag" style="font-size:0.85rem;color:#888;font-weight:normal;"></span></h2>
+      <div class="chart-wrap"><canvas id="quintileChart"></canvas></div>
+    </div>
+    <div class="panel">
+      <h2>各分位指标</h2>
+      <table class="q-table" id="qTable">
+        <thead><tr><th>分位</th><th>年化收益</th><th>年化波动</th><th>Sharpe</th><th>最大回撤</th><th>胜率</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+let navChart = null, retChart = null, quintileChart = null;
+
+function fmtPct(x) { if (x === null || x === undefined || isNaN(x)) return '-'; return (x * 100).toFixed(2) + '%'; }
+function fmtNum(x, d = 3) { if (x === null || x === undefined || isNaN(x)) return '-'; return Number(x).toFixed(d); }
+function showErr(msg) {
+  const box = document.getElementById('error-box');
+  box.textContent = msg;
+  box.classList.remove('hidden');
+}
+function hideErr() { document.getElementById('error-box').classList.add('hidden'); }
+
+function setStatus(s) { document.getElementById('status').textContent = s; }
+
+function makeMetric(label, value, posNeg = false) {
+  let cls = '';
+  if (posNeg && typeof value === 'string' && value !== '-') {
+    const num = parseFloat(value);
+    if (!isNaN(num)) cls = num > 0 ? 'pos' : (num < 0 ? 'neg' : '');
+  }
+  return `<div class="metric"><div class="label">${label}</div><div class="value ${cls}">${value}</div></div>`;
+}
+
+async function runTopN() {
+  hideErr();
+  const start = document.getElementById('start').value;
+  const end = document.getElementById('end').value;
+  const topn = document.getElementById('topn').value;
+  const weight = document.getElementById('weight').value;
+  const cost = document.getElementById('cost').value;
+  if (start >= end) { showErr('开始月必须早于结束月'); return; }
+  setStatus('⏳ 计算中...');
+  document.getElementById('btn-topn').disabled = true;
+  try {
+    const url = `/api/backtest?start=${start}&end=${end}&top_n=${topn}&weight=${weight}&cost_bps=${cost}&benchmark=1`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data.error) { showErr(data.error); return; }
+    renderTopN(data);
+    document.getElementById('topn-result').classList.remove('hidden');
+    setStatus('✓ 完成');
+  } catch (e) {
+    showErr(String(e));
+  } finally {
+    document.getElementById('btn-topn').disabled = false;
+  }
+}
+
+function renderTopN(report) {
+  const s = report.summary || {};
+  const m = document.getElementById('topn-metrics');
+  m.innerHTML = [
+    makeMetric('累计收益', fmtPct(s.cumulative_return), true),
+    makeMetric('年化收益', fmtPct(s.annualized_return), true),
+    makeMetric('年化波动', fmtPct(s.annualized_volatility)),
+    makeMetric('Sharpe', fmtNum(s.sharpe_ratio, 2)),
+    makeMetric('Calmar', fmtNum(s.calmar_ratio, 2)),
+    makeMetric('胜率', fmtPct(s.win_rate)),
+    makeMetric('最大回撤', fmtPct(s.max_drawdown), true),
+    makeMetric('信息比率', fmtNum(s.information_ratio, 2)),
+    makeMetric('月份数', s.n_months || 0),
+  ].join('');
+
+  const navObj = report.nav || {};
+  const labels = Object.keys(navObj).sort();
+  const navVals = labels.map(k => navObj[k]);
+  const benchObj = report.benchmark_nav || {};
+  const benchVals = labels.map(k => benchObj[k] !== undefined ? benchObj[k] : null);
+
+  if (navChart) navChart.destroy();
+  navChart = new Chart(document.getElementById('navChart'), {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        { label: '策略 NAV', data: navVals, borderColor: '#1a6cf7', backgroundColor: 'rgba(26,108,247,0.08)', tension: 0.2, fill: true, pointRadius: 2 },
+        ...(report.benchmark_nav ? [{ label: 'HSI 基准', data: benchVals, borderColor: '#888', borderDash: [5, 4], tension: 0.2, pointRadius: 1, fill: false }] : []),
+      ],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { tooltip: { mode: 'index', intersect: false } },
+      scales: { y: { title: { display: true, text: '净值（起点 1.0）' } } },
+    },
+  });
+
+  const retObj = report.monthly_returns || {};
+  const retLabels = Object.keys(retObj).sort();
+  const retVals = retLabels.map(k => retObj[k]);
+  if (retChart) retChart.destroy();
+  retChart = new Chart(document.getElementById('retChart'), {
+    type: 'bar',
+    data: {
+      labels: retLabels,
+      datasets: [{
+        label: '月度收益',
+        data: retVals,
+        backgroundColor: retVals.map(v => v >= 0 ? 'rgba(21,128,61,0.7)' : 'rgba(215,38,56,0.7)'),
+      }],
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      scales: { y: { ticks: { callback: v => (v * 100).toFixed(0) + '%' } } },
+    },
+  });
+}
+
+async function runQuintile() {
+  hideErr();
+  const start = document.getElementById('start').value;
+  const end = document.getElementById('end').value;
+  const nq = document.getElementById('nq').value;
+  const weight = document.getElementById('weight').value;
+  const cost = document.getElementById('cost').value;
+  if (start >= end) { showErr('开始月必须早于结束月'); return; }
+  setStatus('⏳ 五分位计算中...');
+  document.getElementById('btn-quintile').disabled = true;
+  try {
+    const url = `/api/backtest/quintile?start=${start}&end=${end}&n_quantiles=${nq}&weight=${weight}&cost_bps=${cost}`;
+    const res = await fetch(url);
+    const data = await res.json();
+    if (data.error) { showErr(data.error); return; }
+    renderQuintile(data);
+    document.getElementById('quintile-result').classList.remove('hidden');
+    setStatus('✓ 完成');
+  } catch (e) {
+    showErr(String(e));
+  } finally {
+    document.getElementById('btn-quintile').disabled = false;
+  }
+}
+
+function renderQuintile(report) {
+  const rho = report.spearman_monotonicity;
+  document.getElementById('spearman-tag').textContent = `Spearman 单调性 = ${fmtNum(rho, 3)}`;
+
+  const navs = report.quintile_navs || {};
+  const labels = Array.from(new Set(Object.values(navs).flatMap(o => Object.keys(o)))).sort();
+  const colors = ['#15803d', '#1a6cf7', '#9c27b0', '#ff9800', '#d33', '#444', '#0aa', '#ec4'];
+  const datasets = Object.keys(navs).sort().map((q, i) => ({
+    label: q, data: labels.map(L => navs[q][L] ?? null),
+    borderColor: colors[i % colors.length], tension: 0.2, pointRadius: 2, fill: false,
+  }));
+
+  if (quintileChart) quintileChart.destroy();
+  quintileChart = new Chart(document.getElementById('quintileChart'), {
+    type: 'line',
+    data: { labels, datasets },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { tooltip: { mode: 'index', intersect: false } },
+      scales: { y: { title: { display: true, text: '净值（起点 1.0）' } } },
+    },
+  });
+
+  const tbody = document.querySelector('#qTable tbody');
+  const summaries = report.quintile_summaries || {};
+  tbody.innerHTML = Object.keys(summaries).sort().map(q => {
+    const s = summaries[q];
+    return `<tr>
+      <td><strong>${q}</strong></td>
+      <td>${fmtPct(s.annualized_return)}</td>
+      <td>${fmtPct(s.annualized_volatility)}</td>
+      <td>${fmtNum(s.sharpe_ratio, 2)}</td>
+      <td>${fmtPct(s.max_drawdown)}</td>
+      <td>${fmtPct(s.win_rate)}</td>
+    </tr>`;
+  }).join('');
+
+  // 多空行
+  if (report.long_short) {
+    const ls = report.long_short, s = ls.summary || {};
+    tbody.innerHTML += `<tr style="background:#fff8e1;">
+      <td><strong>${ls.label}</strong></td>
+      <td>${fmtPct(s.annualized_return)}</td>
+      <td>${fmtPct(s.annualized_volatility)}</td>
+      <td>${fmtNum(s.sharpe_ratio, 2)}</td>
+      <td>${fmtPct(s.max_drawdown)}</td>
+      <td>${fmtPct(s.win_rate)}</td>
+    </tr>`;
+  }
+}
+
+document.getElementById('btn-topn').addEventListener('click', runTopN);
+document.getElementById('btn-quintile').addEventListener('click', runQuintile);
+
+// 默认开始月：尽量选靠前的
+(function() {
+  const sel = document.getElementById('start');
+  if (sel.options.length > 0) sel.selectedIndex = 0;
+})();
+</script>
+
+</body>
+</html>

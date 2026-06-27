@@ -1,0 +1,29 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+.pytest_cache/
+.coverage
+.mypy_cache/
+
+# Logs
+*.log
+logs/
+/hk_ranker.log
+/rebuild_pool.log
+/update.log
+
+# IDE / OS
+.DS_Store
+.vscode/
+.idea/
+
+# Tempfiles
+*.tmp
+*.swp
+
+# Sidecar transient state（保留以便审计；如需排除可取消注释）
+# data/csv/hk_financial_failed.json
+# data/csv/hk_financial_empty.json

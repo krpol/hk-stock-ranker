@@ -1,0 +1,198 @@
+# Known Badcases — 真实股票回归验证集
+#
+# 每个 case 由历史 bug 反推沉淀，针对 data/csv/hk_financial.csv 实际值断言。
+# 任何重构使老 bug 复现，pytest tests/test_known_badcases.py 立即 fail。
+#
+# ============================================================
+# 【强制流程】发现任何新 badcase 必须做以下动作：
+#   1. 用户/自测发现某只股票字段有问题 → 定位修复根因
+#   2. 修复后，在本文件 cases: 列表末尾追加一条 case
+#      必填字段：issue（格式 BN）、code（5 位字符串）、name、desc（说明 bug 来源）、expect
+#   3. 跑 pytest tests/test_known_badcases.py 验证新 case 通过
+#   4. 跑全量 pytest 确认无回归
+#   5. 提交（本 yaml 与修复代码放同一 commit）
+#
+# 不允许在不新增 case 的情况下修复 bug——badcase 是 bug 存在证明。
+# ============================================================
+#
+# expect 字段语法：
+#   exact: <value>            严格相等（数值或字符串）
+#   approx: <number>          浮点近似（绝对误差 1e-6）
+#   lt: <number>              字段值 < number
+#   le: <number>              字段值 ≤ number
+#   gt: <number>              字段值 > number
+#   ge: <number>              字段值 ≥ number
+#   range: [min, max]         min ≤ 字段值 ≤ max
+#   contains: ["sub1", ...]   字符串包含全部子串
+#   not_equal_to_field: <other_field>   不等于另一字段值
+#   non_empty: true           非空（非 NaN、非空串）
+
+cases:
+  # ---------------- B2: 未表决预案虚高 ----------------
+  - issue: B2
+    code: "02355"
+    name: 宝业集团
+    desc: |
+      AKShare 派息表中含 ex_date=NaT 的特别分配 5.5 港元（董事会建议未通过股东大会）。
+      旧实现把 5.5 计入 fy_div，导致虚高（应 ≈ 0.096）。
+      修复：compute_dividend_fields 跳过 ex_date=NaT 的记录。
+    expect:
+      fy_div_per_share: { lt: 1.0 }       # 防虚高，绝不能 ≥ 5
+      forward_div_per_share: { lt: 1.0 }
+
+  # ---------------- B5: 8 月底财年中报期识别 ----------------
+  - issue: B5
+    code: "01890"
+    name: 中国科培
+    desc: |
+      fy_anchor=(8,31)，2026-02-28 中报已发但无派息。
+      旧实现用 2024 闰年算 interim_md=(2,29)，过滤掉非闰年的 (2,28) 中报期。
+      修复：用「月份匹配 + 月末容差 (≥28)」替代严格 (month, day) 相等。
+      B11 更新：2026-03-06 中期 0.07 已正确归到 2026-02-28 中报期，
+      所以 latest_period_div 应是 0.07（不再是 0）。
+    expect:
+      latest_period_end: { exact: "2026-02-28" }
+      latest_period_div_per_share: { approx: 0.07 }
+      fiscal_periods: { contains: ["2025-08-31", "2025-02-28"] }
+      current_fy_end: { exact: "2025-08-31" }
+
+  - issue: B5
+    code: "01773"
+    name: 天立国际控股
+    desc: 8 月底财年，B5 修复后 latest_period 应识别为中报期 2026-02-28。
+    expect:
+      latest_period_end: { exact: "2026-02-28" }
+      fiscal_periods: { contains: ["2025-02-28"] }
+      current_fy_end: { exact: "2025-08-31" }
+
+  - issue: B5
+    code: "01969"
+    name: 中国春来
+    desc: 8 月底财年，B5 修复后 latest_period 应识别为中报期 2026-02-28。
+    expect:
+      latest_period_end: { exact: "2026-02-28" }
+      fiscal_periods: { contains: ["2025-02-28"] }
+      current_fy_end: { exact: "2025-08-31" }
+
+  # ---------------- B5 间接验证：12 月底财年 5 月时点正常态 ----------------
+  # 这些股票在 B5 修复后字段值发生变化（fiscal_periods 等），用于验证修复后稳态。
+  - issue: B5
+    code: "00270"
+    name: 粤海投资
+    desc: 12 月底财年，B5 修复后 fiscal_periods 应包含中报期 6-30。
+    expect:
+      fiscal_periods: { contains: ["2025-12-31", "2025-06-30"] }
+      current_fy_end: { exact: "2025-12-31" }
+
+  - issue: B5
+    code: "01070"
+    name: TCL 电子
+    expect:
+      fiscal_periods: { contains: ["2025-12-31", "2025-06-30"] }
+
+  - issue: B5
+    code: "01099"
+    name: 国药控股
+    expect:
+      fiscal_periods: { contains: ["2025-12-31", "2025-06-30"] }
+
+  - issue: B5
+    code: "01272"
+    name: 大唐环境
+    expect:
+      fiscal_periods: { contains: ["2025-12-31", "2025-06-30"] }
+
+  - issue: B5
+    code: "01599"
+    name: 城建设计
+    expect:
+      fiscal_periods: { contains: ["2025-12-31", "2025-06-30"] }
+
+  - issue: B5
+    code: "01798"
+    name: 大唐新能源
+    expect:
+      fiscal_periods: { contains: ["2025-12-31", "2025-06-30"] }
+
+  # ---------------- B7: AKShare 派息方案缺「元」字导致漏统 ----------------
+  - issue: B7
+    code: "02602"
+    name: 万物云
+    desc: |
+      AKShare 2024 中期分配方案原文为「每股派人民币0.562元(相当于港币0.622)」，
+      末尾缺「元」字，B7 修复前正则 r"相当于...港币\s*([\d.]+)\s*元" 匹配失败，
+      导致该笔 0.622 HKD 被 silently 丢弃，prev_year_div 少算（1.457 而非 2.079）。
+      修复：4 条 pattern 末尾「元」改为「元?」（可选）。
+    expect:
+      prev_year_div_per_share: { range: [2.0, 2.2] }   # 正确值 2.079，允许小范围浮动
+      fy_div_per_share: { range: [1.5, 2.0] }           # FY2025: 中期 1.043 + 年度 0.624 = 1.667
+
+  # ---------------- B9: 单日成交额采样偏差导致冷门股被永久踢出 ----------------
+  - issue: B9
+    code: "01245"
+    name: NIRAKU
+    desc: |
+      rebuild-pool 时单日快照 amount 过滤：若 rebuild 当天恰好停牌/零成交，
+      该股会被踢出 stock_pool 全年；下次 rebuild（默认 365 天后）才有机会再入。
+      01245 NIRAKU 在 2026/05/22 rebuild 当天 amount=0，但 5/27 ~80 万、5/29 ~20 万港元成交，
+      实际是流动性可接受的冷门票，旧逻辑导致它从 pool/financial/ranking 全部消失。
+      修复（B9）：单日不过的票，用 yfinance 拉近 N=5 个交易日 max(close*volume) 复核，
+      只要窗口内任一天满足门槛（10000 港元）即入池；新增 --liquidity-window CLI 控制窗口大小。
+
+      【B9 实跑验证（2026-06-01）】：B9 复核机制本身工作正常，对 804 只单日 fail 的票补回 344 只。
+      01245 当日 amount=68,778 港元 > 1万门槛，单日 Step 2 就通过（未走 B9 复核）。
+      但 01245 在 Step 4 「合股/增发过滤」被误杀（B10：has_share_dilution 单点噪声误判）。
+      B10 已修复 + has_share_dilution('01245') 函数级别已返回 False；
+      待最新一轮 rebuild 完成后，01245 即可重新进 pool/financial，恢复 require_present。
+    require_present: false   # 临时禁用：当前后台 rebuild（PID 46053，启动于 2026-06-01 20:10，~3.5h）
+                             # 完成后，01245 才会重新进 financial.csv；届时改回 true 并删除本注释。
+    expect:
+      name: { exact: "NIRAKU" }
+
+  # ---------------- B11: AKShare fiscal_year 偏移导致中报派息错归 ----------------
+  - issue: B11
+    code: "01890"
+    name: 中国科培
+    desc: |
+      用户报：「半年报没有预分红，同比是下降的」。
+      事实：AKShare/yfinance 派息表显示 2026-03-06 中期派 0.07 港元，
+      但 financial.csv 中 latest_period_div_per_share=0（应是 0.07）+ fy_div=0.13（应是 0.06，FY2025 仅 2025-08-01 一笔 0.06）。
+
+      根因：AKShare 的 `fiscal_year` 字段对 01890 普遍偏小 1 年（如 2026-03-06 中期标
+      fiscal_year=2025，实属 FY2026 中报），旧 R2 规则把它强行归到 2025-08-31 年报期，
+      导致 fy_div 双计 + 2026-02-28 中报期 latest_period_div=0。
+
+      修复（B11）：R2 重写为按 distribution_type ("中期"/"年度"/"末期"/"特别") + ex_date
+      归到距 ex_date 最近的对应期类型（年报期/中报期），不再信任 AKShare fiscal_year。
+    expect:
+      latest_period_end: { exact: "2026-02-28" }
+      latest_period_div_per_share: { approx: 0.07 }
+      latest_period_yoy_div_per_share: { approx: 0.07 }
+      forward_div_per_share: { approx: 0.06 }
+
+# ============================================================
+# 全集不变量（不绑定特定 code，对全部股票生效）
+# ============================================================
+global_invariants:
+  - issue: B4
+    rule: forward_le_fy
+    desc: |
+      forward_div_per_share 必须 ≤ fy_div_per_share。
+      因 fy_div 已包含 forward 部分，相加会双计（B4 修复内容）。
+    tolerance: 1.0e-6
+
+  - issue: B3
+    rule: total_liability_ratio_coverage
+    desc: |
+      total_liability_ratio 字段必须存在；
+      NaN 比例不超过 50%（B3 引入双阈值过滤后的覆盖度保证）。
+    max_nan_ratio: 0.5
+
+  - issue: B2
+    rule: no_outlier_dividend
+    desc: |
+      防御性兜底：没有任何股票的 fy_div_per_share / forward_div_per_share 超过 30.0 港元。
+      避免类似 02355 5.5 港元未表决预案、或解析错误（如把 RMB 当 HKD）的极端异常。
+      港股最高年度派息约 25 港元/股（如 06181 太古），阈值 30 留有余量。
+      若未来有合规公司确实超过此值，需逐一审查后调整阈值。
+    threshold: 30.0
