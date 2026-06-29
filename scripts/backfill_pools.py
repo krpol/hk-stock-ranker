@@ -28,6 +28,7 @@ CLI:
     python -m scripts.backfill_pools --no-skip-existing  # 强制重做
 """
 import argparse
+import json
 import logging
 import os
 import random
@@ -56,6 +57,68 @@ from storage import store as _store
 
 logger = logging.getLogger(__name__)
 
+# ============================================================
+# A11: yfinance 原始数据缓存（避免每次全量重拉）
+# ============================================================
+_CACHE_DIR = os.path.join(PROJECT_ROOT, "data", "cache")
+_CACHE_FILE = os.path.join(_CACHE_DIR, "yf_raw_cache.json")
+_FAILED_FILE = os.path.join(_CACHE_DIR, "yf_raw_failed.json")
+
+
+def _load_raw_cache() -> dict:
+    """加载缓存 {code: {divs: [[date, val], ...], shares: [[date, val], ...] or null, ts: str}}"""
+    if os.path.exists(_CACHE_FILE):
+        try:
+            with open(_CACHE_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception as e:
+            logger.warning(f"读取 yf_raw_cache 失败: {e}")
+    return {}
+
+
+def _save_raw_cache(cache: dict) -> None:
+    """写回缓存"""
+    os.makedirs(_CACHE_DIR, exist_ok=True)
+    with open(_CACHE_FILE, "w", encoding="utf-8") as f:
+        json.dump(cache, f, ensure_ascii=False)
+
+
+def _load_failed() -> dict:
+    """加载失败列表 {code: {reason: str, ts: str}}"""
+    if os.path.exists(_FAILED_FILE):
+        try:
+            with open(_FAILED_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            pass
+    return {}
+
+
+def _save_failed(failed: dict) -> None:
+    os.makedirs(_CACHE_DIR, exist_ok=True)
+    with open(_FAILED_FILE, "w", encoding="utf-8") as f:
+        json.dump(failed, f, ensure_ascii=False, indent=2)
+
+
+def _series_from_cache(raw: list) -> Optional[pd.Series]:
+    """[[date_str, val], ...] → pd.Series(DatetimeIndex, float)"""
+    if not raw:
+        return pd.Series(dtype=float)
+    dates, vals = [], []
+    for d, v in raw:
+        dates.append(pd.Timestamp(d))
+        vals.append(float(v))
+    return pd.Series(vals, index=pd.DatetimeIndex(dates))
+
+
+def _series_to_cache(s: Optional[pd.Series]) -> Optional[list]:
+    """pd.Series → [[date_str, val], ...]"""
+    if s is None:
+        return None
+    if s.empty:
+        return []
+    return [[str(d.date()), round(float(v), 10)] for d, v in s.items()]
+
 
 # ============================================================
 # A10: 批量预取 + 内存切片（核心优化）
@@ -65,19 +128,43 @@ def _prefetch_ticker_data(
     code: str,
     oldest_cutoff: datetime,
     latest_end: datetime,
+    _cache: Optional[dict] = None,
+    _failed: Optional[dict] = None,
 ) -> Tuple[Optional[pd.Series], Optional[pd.Series]]:
     """
-    一次性拉取该股票从 oldest_cutoff 到 latest_end 的：
-      1. 分红时间序列 (DatetimeIndex 已去时区，仅含 dividends > 0 的事件)
-      2. 月末股份数序列 (.resample("ME").last())
+    带缓存的 yfinance 原始数据拉取。
 
-    后续可对此序列做任意基准日的内存切片。
+    缓存命中（code 在 _cache 且 ts 足够新）→ 直接反序列化返回，不调 yfinance。
+    缓存未命中 → 调 yfinance；成功则写缓存并从 failed 移除；失败则写 failed。
 
-    Returns:
-        (divs, monthly_shares)；任一为 None 表示该数据源不可用。
+    Args:
+        _cache: 外部传入的缓存 dict（避免每次读文件）；None 时不用缓存。
+        _failed: 外部传入的失败列表 dict；None 时不用。
     """
+    # ---- 缓存命中检查 ----
+    if _cache is not None and code in _cache:
+        entry = _cache[code]
+        cached_ts = pd.Timestamp(entry.get("ts", "2000-01-01"))
+        # 缓存覆盖范围: [oldest_cutoff, cached_ts]
+        # 如果 cached_ts >= latest_end 且 oldest_cutoff 足够早 → 可用
+        if cached_ts >= pd.Timestamp(latest_end):
+            divs = _series_from_cache(entry.get("divs"))
+            shares_raw = entry.get("shares")
+            if shares_raw is None:
+                monthly_shares = None  # 双重上市豁免
+            else:
+                monthly_shares = _series_from_cache(shares_raw)
+            # 裁剪到本次窗口
+            if divs is not None and not divs.empty:
+                divs = divs[(divs.index >= pd.Timestamp(oldest_cutoff)) & (divs.index <= pd.Timestamp(latest_end))]
+            if monthly_shares is not None and not monthly_shares.empty:
+                monthly_shares = monthly_shares[(monthly_shares.index >= pd.Timestamp(oldest_cutoff)) & (monthly_shares.index <= pd.Timestamp(latest_end))]
+            return divs, monthly_shares
+
+    # ---- 缓存未命中 → 调 yfinance ----
     divs: Optional[pd.Series] = None
     monthly_shares: Optional[pd.Series] = None
+    fetch_ok = True
 
     # ---- 1. 分红序列（hist[Dividends]） ----
     max_retries = 3
@@ -114,46 +201,61 @@ def _prefetch_ticker_data(
             else:
                 logger.debug(f"[{code}] 分红预取失败: {err[:80]}")
                 divs = pd.Series(dtype=float)
+                fetch_ok = False
                 break
 
     # ---- 2. 月末股份数（get_shares_full） ----
     # 双重上市股票直接跳过（与 has_share_dilution 行为一致）
     if code in DUAL_LISTED_EXEMPT:
-        return divs, None  # None 表示豁免（决策时不剔除）
-
-    for attempt in range(max_retries):
-        try:
-            t = _get_ticker(code)
-            shares = t.get_shares_full(
-                start=oldest_cutoff.strftime("%Y-%m-%d"),
-                end=latest_end.strftime("%Y-%m-%d"),
-            )
-            if shares is not None and len(shares) >= 2:
-                shares = shares.sort_index()
-                try:
-                    if shares.index.tz is not None:
-                        shares.index = shares.index.tz_localize(None)
-                except Exception:
-                    pass
-                # 月末重采样，得到月末股份数
-                monthly_shares = shares.resample("ME").last().dropna()
-            else:
-                monthly_shares = pd.Series(dtype=float)
-            time.sleep(random.uniform(0.5, 1.2))
-            break
-        except Exception as e:
-            err = str(e)
-            if any(kw in err for kw in (
-                "Could not resolve", "timed out", "Connection aborted",
-                "RemoteDisconnected", "Failed to perform",
-            )):
-                wait = 5 + random.uniform(2, 8) * (attempt + 1)
-                logger.debug(f"[{code}] 股份数预取网络异常，等待 {wait:.0f}s 重试 ({attempt+1}/{max_retries})")
-                time.sleep(wait)
-            else:
-                logger.debug(f"[{code}] 股份数预取失败: {err[:80]}")
-                monthly_shares = pd.Series(dtype=float)
+        monthly_shares = None  # None 表示豁免（决策时不剔除）
+    else:
+        for attempt in range(max_retries):
+            try:
+                t = _get_ticker(code)
+                shares = t.get_shares_full(
+                    start=oldest_cutoff.strftime("%Y-%m-%d"),
+                    end=latest_end.strftime("%Y-%m-%d"),
+                )
+                if shares is not None and len(shares) >= 2:
+                    shares = shares.sort_index()
+                    try:
+                        if shares.index.tz is not None:
+                            shares.index = shares.index.tz_localize(None)
+                    except Exception:
+                        pass
+                    monthly_shares = shares.resample("ME").last().dropna()
+                else:
+                    monthly_shares = pd.Series(dtype=float)
+                time.sleep(random.uniform(0.5, 1.2))
                 break
+            except Exception as e:
+                err = str(e)
+                if any(kw in err for kw in (
+                    "Could not resolve", "timed out", "Connection aborted",
+                    "RemoteDisconnected", "Failed to perform",
+                )):
+                    wait = 5 + random.uniform(2, 8) * (attempt + 1)
+                    logger.debug(f"[{code}] 股份数预取网络异常，等待 {wait:.0f}s 重试 ({attempt+1}/{max_retries})")
+                    time.sleep(wait)
+                else:
+                    logger.debug(f"[{code}] 股份数预取失败: {err[:80]}")
+                    monthly_shares = pd.Series(dtype=float)
+                    fetch_ok = False
+                    break
+
+    # ---- 写缓存 / 写 failed ----
+    now_str = datetime.now().strftime("%Y-%m-%dT%H:%M:%S")
+    if _cache is not None:
+        _cache[code] = {
+            "divs": _series_to_cache(divs),
+            "shares": _series_to_cache(monthly_shares) if monthly_shares is not None else None,
+            "ts": now_str,
+        }
+    if _failed is not None:
+        if not fetch_ok:
+            _failed[code] = {"reason": "yf_fetch_fail", "ts": now_str}
+        elif code in _failed:
+            del _failed[code]  # 本次成功，从 failed 移除
 
     return divs, monthly_shares
 
@@ -231,6 +333,9 @@ def backfill_all_pools_batched(
     targets: List[datetime],
     today_full_list: pd.DataFrame,
     log_progress_every: int = 50,
+    retry_failed_only: bool = False,
+    _cache: Optional[dict] = None,
+    _failed: Optional[dict] = None,
 ) -> dict:
     """
     批量优化版：每只股票只调 1 次 yfinance（hist + shares_full），
@@ -239,6 +344,9 @@ def backfill_all_pools_batched(
     Args:
         targets: 基准日列表（升序），如 [2020-12-31, 2021-12-31, ..., 2025-12-31]
         today_full_list: 今日全量列表
+        retry_failed_only: 只重试 _failed 中的股票（跳过缓存已有的）
+        _cache: 外部传入的缓存 dict；None 时不用缓存
+        _failed: 外部传入的失败列表 dict；None 时不用
 
     Returns:
         dict {as_of_str: pool_DataFrame}
@@ -251,6 +359,12 @@ def backfill_all_pools_batched(
 
     df = today_full_list.copy()
     df["code"] = df["code"].astype(str).str.zfill(5)
+
+    # retry_failed_only 模式：只拉 failed 列表里的股票
+    if retry_failed_only and _failed is not None:
+        failed_codes = set(_failed.keys())
+        df = df[df["code"].isin(failed_codes)]
+        logger.info(f"retry-failed 模式: 只拉 {len(df)} 只 (共 {len(failed_codes)} 失败)")
 
     # 最早 cutoff = min(target) - 3 年
     oldest = min(targets) - timedelta(days=3 * 365 + 90)  # 多加 90 天 buffer
@@ -280,8 +394,8 @@ def backfill_all_pools_batched(
                 f"  [{i+1}/{total}] 速度 {speed:.2f} 股/秒 ETA {eta_min:.1f} 分; 当前累积: {sizes}"
             )
 
-        # 一次性预取
-        divs, monthly_shares = _prefetch_ticker_data(code, oldest, latest)
+        # 一次性预取（带缓存）
+        divs, monthly_shares = _prefetch_ticker_data(code, oldest, latest, _cache=_cache, _failed=_failed)
 
         # 对每个基准日做内存判定
         for t_dt in targets:
@@ -409,9 +523,13 @@ def run_backfill(
     years_back: int = 5,
     only_as_of: datetime = None,
     skip_existing: bool = True,
+    retry_failed: bool = False,
 ) -> dict:
     """
     主流程。
+
+    Args:
+        retry_failed: 只重试上次失败的股票（跳过缓存已有的）
 
     Returns:
         dict {as_of_date_str: pool_size_or_'skipped'}
@@ -463,10 +581,24 @@ def run_backfill(
         logger.info(f"===== 全部已存在，无需回填 =====\n{summary}")
         return summary
 
+    # ---- Step 2c: 加载缓存 & failed ----
+    _cache = _load_raw_cache()
+    _failed = _load_failed()
+    logger.info(f"  缓存: {len(_cache)} 只; failed: {len(_failed)} 只")
+
     # ---- Step 3: 批量预取 + 内存切片（一次性处理所有 pending 基准日） ----
     t0 = time.time()
-    pools_by_date = backfill_all_pools_batched(pending_targets, full_list)
+    pools_by_date = backfill_all_pools_batched(
+        pending_targets, full_list,
+        retry_failed_only=retry_failed,
+        _cache=_cache, _failed=_failed,
+    )
     elapsed = time.time() - t0
+
+    # ---- Step 3b: 保存缓存 & failed ----
+    _save_raw_cache(_cache)
+    _save_failed(_failed)
+    logger.info(f"  缓存已保存: {len(_cache)} 只; failed: {len(_failed)} 只")
 
     for as_of in pending_targets:
         key = as_of.strftime("%Y-%m-%d")
@@ -496,6 +628,8 @@ def main():
                         help="只回填某一个基准日，格式 YYYY-MM-DD（覆盖 --years-back）")
     parser.add_argument("--no-skip-existing", action="store_true",
                         help="强制重做已有快照")
+    parser.add_argument("--retry-failed", action="store_true",
+                        help="只重试上次 yfinance 拉取失败的股票（跳过缓存已有的）")
     args = parser.parse_args()
 
     only_as_of = None
@@ -506,6 +640,7 @@ def main():
         years_back=args.years_back,
         only_as_of=only_as_of,
         skip_existing=not args.no_skip_existing,
+        retry_failed=args.retry_failed,
     )
 
 
