@@ -1,0 +1,402 @@
+{
+  "BK1717": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1716": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1715": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1714": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1713": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1712": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1711": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1710": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1682": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1681": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1680": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1679": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1678": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1677": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1676": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1675": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1674": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1673": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1672": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1671": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1670": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1669": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1668": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1667": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1666": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1665": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1664": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1663": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1662": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1661": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1660": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1659": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1658": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1657": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1656": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1655": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1654": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1653": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1652": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1651": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1650": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1649": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1648": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1647": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1646": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1645": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1644": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1643": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1642": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1641": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1640": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1639": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1638": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1637": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1636": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1635": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1633": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1632": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1631": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1630": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1629": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1628": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1627": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1626": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1625": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1624": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1623": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1622": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1621": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1620": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1619": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1618": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1617": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1616": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1615": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1614": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1613": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1612": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1611": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1610": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1609": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1608": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1607": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1606": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1605": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1604": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1603": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1602": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1601": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1600": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1599": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1598": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1597": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1596": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1595": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1594": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1593": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1592": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1591": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  },
+  "BK1590": {
+    "reason": "yf_fetch_fail",
+    "ts": "2026-06-29T14:20:46"
+  }
+}
