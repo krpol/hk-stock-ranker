@@ -524,23 +524,63 @@ def run_backfill(
     only_as_of: datetime = None,
     skip_existing: bool = True,
     retry_failed: bool = False,
+    from_local: bool = False,
 ) -> dict:
     """
     主流程。
 
     Args:
         retry_failed: 只重试上次失败的股票（跳过缓存已有的）
+        from_local: 从本地 hk_stock_pool.csv 加载列表（不调 AKShare）
 
     Returns:
         dict {as_of_date_str: pool_size_or_'skipped'}
     """
     # ---- Step 1: 获取今日全量列表（仅一次） ----
     logger.info("Step 1: 获取今日全量港股列表（作为历史池的样本来源）...")
-    full_list = get_hk_stock_list()
-    if full_list.empty:
-        logger.error("获取港股列表失败")
-        return {}
+    if from_local:
+        full_list = _store.load_stock_pool()
+        if full_list.empty:
+            # fallback: hk_stock_list.csv
+            full_list = _store.load_stock_list()
+        if full_list.empty:
+            logger.error("本地列表为空")
+            return {}
+        logger.info(f"  从本地加载: {len(full_list)} 只")
+    else:
+        full_list = get_hk_stock_list()
+        if full_list.empty:
+            # fallback: 从本地缓存加载
+            full_list = _store.load_stock_list()
+            if not full_list.empty:
+                logger.info(f"  AKShare 失败，使用本地 stock_list ({len(full_list)} 只)")
+            else:
+                logger.error("获取港股列表失败（本地也无缓存）")
+                return {}
     logger.info(f"  今日全量: {len(full_list)} 只")
+
+    # ---- Step 1a: 合并已有池（用 hk_stock_pool.csv 的 market_cap 覆盖 AKShare NaN）----
+    # AKShare 主源部分小盘股 market_cap=NaN 被流动性预筛误杀，
+    # 而 hk_stock_pool.csv（由 rebuild-pool 生成）含可靠 market_cap。
+    # 合并策略：以 AKShare 为主，已有池覆盖 market_cap 缺失值；补充已有池独有股票
+    existing_pool = _store.load_stock_pool()
+    if not existing_pool.empty and not full_list.empty:
+        existing_pool["code"] = existing_pool["code"].astype(str).str.zfill(5)
+        full_list["code"] = full_list["code"].astype(str).str.zfill(5)
+        # 覆盖 AKShare 中 market_cap=NaN 的（用已有池的值）
+        if "market_cap" in full_list.columns and "market_cap" in existing_pool.columns:
+            mcap_missing = full_list["market_cap"].isna() | (full_list["market_cap"] == 0)
+            pool_map = existing_pool.set_index("code")["market_cap"].to_dict()
+            for idx in full_list.index[mcap_missing]:
+                code = full_list.at[idx, "code"]
+                if code in pool_map and pd.notna(pool_map.get(code)) and pool_map.get(code, 0) > 0:
+                    full_list.at[idx, "market_cap"] = pool_map[code]
+        # 补充已有池中独有的股票（AKShare 列表里没有的）
+        extra = existing_pool[~existing_pool["code"].isin(full_list["code"])]
+        if not extra.empty:
+            before = len(full_list)
+            full_list = pd.concat([full_list, extra], ignore_index=True)
+            logger.info(f"  合并已有池补 {len(extra)} 只独有股票: {before} -> {len(full_list)} 只")
 
     # 同步保存为最新 stock_list（不动 hk_stock_pool.csv）
     _store.save_stock_list(full_list)
@@ -549,11 +589,17 @@ def run_backfill(
     # 严格策略放弃"历史时点流动性过滤"，但保留"今日流动性预筛"作为
     # 「该股票长期具备最低交易活跃度」的代理；避免把 ~2000 只仙股喂给 yfinance，
     # 使 yfinance 调用从 ~33000 次缩到 ~9000 次（~5 倍提速）。
+    # 注意：从 hk_stock_pool.csv 补入的股票已有可靠 market_cap，不再预筛
     from config.settings import HK_STOCK_FILTERS
     cap_filter = HK_STOCK_FILTERS.get("min_market_cap", 0)
     if cap_filter and "market_cap" in full_list.columns:
         before = len(full_list)
-        full_list = full_list[full_list["market_cap"].fillna(0) >= cap_filter].copy()
+        # 来自 hk_stock_pool.csv 的已在 Step 1a 检查过 market_cap，此处只筛 AKShare 源的
+        pool_codes = set(existing_pool["code"]) if not existing_pool.empty else set()
+        is_from_pool = full_list["code"].isin(pool_codes)
+        needs_filter = ~is_from_pool
+        mask = needs_filter & (full_list["market_cap"].fillna(0) < cap_filter)
+        full_list = full_list[~mask].copy()
         logger.info(
             f"  流动性预筛（今日 market_cap/amount >= {cap_filter}）: "
             f"{before} -> {len(full_list)} 只"
@@ -630,6 +676,8 @@ def main():
                         help="强制重做已有快照")
     parser.add_argument("--retry-failed", action="store_true",
                         help="只重试上次 yfinance 拉取失败的股票（跳过缓存已有的）")
+    parser.add_argument("--from-local", action="store_true",
+                        help="从本地 hk_stock_pool.csv 加载列表（不调 AKShare）")
     args = parser.parse_args()
 
     only_as_of = None
@@ -641,6 +689,7 @@ def main():
         only_as_of=only_as_of,
         skip_existing=not args.no_skip_existing,
         retry_failed=args.retry_failed,
+        from_local=args.from_local,
     )
 
 
