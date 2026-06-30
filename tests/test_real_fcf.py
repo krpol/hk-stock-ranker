@@ -99,11 +99,14 @@ def test_rating_warn():
 
 
 def test_rating_ok():
+    # 20% ≤ 覆盖率 < 100% → OK
     assert classify_rating(10, 0.25, False) == "OK"
+    assert classify_rating(10, 0.50, False) == "OK"
 
 
 def test_rating_strong():
-    assert classify_rating(10, 0.50, False) == "STRONG"
+    # 覆盖率 ≥ 100% → STRONG
+    assert classify_rating(10, 1.50, False) == "STRONG"
 
 
 def test_rating_na_missing():
@@ -187,10 +190,10 @@ def test_downgrade_steps():
 
 
 def test_rating_downgrade_warn_drop():
-    # 原 STRONG（覆盖率 0.5），drop_ratio 0.2 (<0.3) → 下调一档 → OK
-    assert classify_rating(10, 0.50, False, drop_ratio=0.2) == "OK"
+    # 原 STRONG（覆盖率 1.5），drop_ratio 0.2 (<0.3) → 下调一档 → OK
+    assert classify_rating(10, 1.50, False, drop_ratio=0.2) == "OK"
     # drop_ratio -0.1 (转负) → 下调两档 → WARN
-    assert classify_rating(10, 0.50, False, drop_ratio=-0.1) == "WARN"
+    assert classify_rating(10, 1.50, False, drop_ratio=-0.1) == "WARN"
 
 
 def test_rating_downgrade_skip_aaa():
@@ -200,7 +203,7 @@ def test_rating_downgrade_skip_aaa():
 
 def test_rating_no_downgrade_when_drop_ratio_none():
     # drop_ratio=None 不降级
-    assert classify_rating(10, 0.50, False, drop_ratio=None) == "STRONG"
+    assert classify_rating(10, 1.50, False, drop_ratio=None) == "STRONG"
 
 
 def test_rating_downgrade_below_warn():

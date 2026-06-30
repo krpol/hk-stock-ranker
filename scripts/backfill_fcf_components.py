@@ -40,6 +40,8 @@ FIELDS = [
     "capex_ttm",
     "da_ttm",
     "current_lease_obligation_ttm",
+    "prev_capex",
+    "prev_da",
 ]
 
 

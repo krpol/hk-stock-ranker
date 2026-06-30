@@ -33,7 +33,6 @@ OUTPUT_COLUMNS = [
     "current_price",
     "composite_score",
     "return_zscore",
-    "growth_factor",
     "return_rate",
     "fy_div_per_share",
     "real_ttm_return_rate",
@@ -56,6 +55,12 @@ OUTPUT_COLUMNS = [
     "growth_zscore_operating_income",
     "growth_zscore_operating_cashflow",
     "growth_zscore_ttm_return",
+    "growth_zscore_fcf_equity",
+    "growth_zscore_fcf_momentum",
+    "real_fcf_ttm",
+    "prev_real_fcf_ttm",
+    "fcf_to_equity",
+    "fcf_momentum",
     "growth_factor",
     "cash_buffer_ratio",
     "cash_buffer_zscore",
@@ -111,11 +116,21 @@ COLUMN_LABELS = {
     "drop_ratio": "近1年突降",
     "cash_buffer_ratio": "现金缓冲比",
     "cash_buffer_zscore": "现金缓冲 Z",
+    "cash_buffer_ratio_v2": "现金缓冲比v2",
+    "fcf_yield": "FCF收益率",
+    "fcf_to_equity": "FCF/净资产",
+    "fcf_momentum": "现金流动量",
+    "real_fcf_ttm": "TTM剩余CF",
+    "prev_real_fcf_ttm": "上年TTM剩余CF",
+    "_ocf_3y_pos": "3年OCF为正",
+    "_two_years_ago_div_per_share": "前年每股分红(HKD)",
     "ttm_return_yoy": "TTM回报金额同比",
     "growth_zscore_revenue": "营收增长 Z",
     "growth_zscore_operating_income": "营业利润增长 Z",
     "growth_zscore_operating_cashflow": "经营现金流增长 Z",
     "growth_zscore_ttm_return": "TTM回报增长 Z",
+    "growth_zscore_fcf_equity": "FCF/净资产 Z",
+    "growth_zscore_fcf_momentum": "现金流动量 Z",
     "growth_factor": "增长因子",
     "pe_ttm": "PE(TTM)",
     "pb": "PB",
@@ -380,17 +395,55 @@ def rank_stocks(
     else:
         merged["ttm_return_yoy"] = pd.NA
 
+    # --- B33: TTM 版 real_fcf（两期）+ FCF/净资产 + 现金流动量 ---
+    # real_fcf_ttm      = ocf_ttm      − min(capex_ttm + lease_ttm,  da_ttm)
+    # prev_real_fcf_ttm = prev_ttm_ocf − min(prev_capex + lease_prev, prev_da)
+    # fcf_to_equity     = real_fcf_ttm / equity_latest                  （水平）
+    # fcf_momentum      = (real_fcf_ttm − prev_real_fcf_ttm) / equity   （动量）
+    def _num(name: str) -> pd.Series:
+        if name in merged.columns:
+            return pd.to_numeric(merged[name], errors="coerce")
+        import numpy as _np
+        return pd.Series(_np.nan, index=merged.index, dtype="float64")
+
+    _ocf_ttm = _num("ttm_operating_cashflow")
+    _capex_ttm = _num("capex_ttm")
+    _da_ttm = _num("da_ttm")
+    _lease_ttm = _num("current_lease_obligation_ttm").fillna(0.0)
+    _prev_ocf = _num("prev_ttm_operating_cashflow")
+    _prev_capex = _num("prev_capex")
+    _prev_da = _num("prev_da")
+    _lease_prev = _num("current_lease_obligation_prev").fillna(0.0)
+    _eq = _num("equity_latest")
+
+    # 当期 TTM real_fcf：D&A 上限取 min(capex+lease, da)
+    _adj_ttm = pd.concat([(_capex_ttm + _lease_ttm), _da_ttm], axis=1).min(axis=1)
+    real_fcf_ttm = _ocf_ttm - _adj_ttm
+    # 上年 TTM real_fcf
+    _adj_prev = pd.concat([(_prev_capex + _lease_prev), _prev_da], axis=1).min(axis=1)
+    prev_real_fcf_ttm = _prev_ocf - _adj_prev
+
+    _eq_pos = _eq.where(_eq > 0)
+    merged["real_fcf_ttm"] = real_fcf_ttm.round(2)
+    merged["prev_real_fcf_ttm"] = prev_real_fcf_ttm.round(2)
+    merged["fcf_to_equity"] = (real_fcf_ttm / _eq_pos).round(4)
+    merged["fcf_momentum"] = ((real_fcf_ttm - prev_real_fcf_ttm) / _eq_pos).round(4)
+
     GROWTH_COLS = [
         "revenue_yoy",
         "operating_income_yoy",
         "operating_cashflow_yoy",
         "ttm_return_yoy",
+        "fcf_to_equity",
+        "fcf_momentum",
     ]
     ZSCORE_COLS = [
         "growth_zscore_revenue",
         "growth_zscore_operating_income",
         "growth_zscore_operating_cashflow",
         "growth_zscore_ttm_return",
+        "growth_zscore_fcf_equity",
+        "growth_zscore_fcf_momentum",
     ]
     for col in GROWTH_COLS:
         if col not in merged.columns:
@@ -398,13 +451,15 @@ def rank_stocks(
     for src, dst in zip(GROWTH_COLS, ZSCORE_COLS):
         merged[dst] = _winsorized_zscore(merged[src])
     z_df = merged[ZSCORE_COLS].apply(pd.to_numeric, errors="coerce")
-    # 加权平均：TTM 回报同比权重 ×2，其它三个权重 1
+    # 加权平均：TTM 回报同比权重 ×2，其它子因子权重 1
     # 用 NaN-safe 加权：sum(w_i * z_i) / sum(w_i for non-NaN)
     GROWTH_WEIGHTS = {
         "growth_zscore_revenue": 1.0,
         "growth_zscore_operating_income": 1.0,
         "growth_zscore_operating_cashflow": 1.0,
         "growth_zscore_ttm_return": 2.0,
+        "growth_zscore_fcf_equity": 1.0,
+        "growth_zscore_fcf_momentum": 1.0,
     }
     weights = pd.Series(GROWTH_WEIGHTS)[ZSCORE_COLS]
     weighted_sum = z_df.mul(weights, axis=1).sum(axis=1, skipna=True, min_count=1)

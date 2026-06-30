@@ -37,7 +37,7 @@ DOMAIN_FIELDS: dict = {
     ],
     "debt": ["net_debt_ratio", "total_liability_ratio", "debt_to_equity", "roe", "cash_and_equivalents", "interest_bearing_debt",
              "ocf_3y_avg", "capex_3y_avg", "dep_amortization_3y_avg", "current_lease_obligation_prev", "equity_latest",
-             "capex_ttm", "da_ttm", "current_lease_obligation_ttm"],
+             "capex_ttm", "da_ttm", "current_lease_obligation_ttm", "prev_capex", "prev_da"],
     "dilution": ["annual_dilution_rate"],
     "growth": [
         "ttm_revenue", "prev_ttm_revenue", "ttm_revenue_t2", "revenue_yoy",
@@ -1140,6 +1140,33 @@ def get_fcf_components(code: str) -> Optional[dict]:
             "Depreciation",
         ], take_abs=True)
 
+        # B33: 上年同期（年报第 2 列）capex / da，用于 prev_real_fcf_ttm 现金流动量
+        def _nth_abs(df, keys, col_idx, take_abs=True):
+            if df is None or df.empty:
+                return None
+            cols = list(df.columns)
+            if len(cols) <= col_idx:
+                return None
+            target_col = cols[col_idx]
+            for k in keys:
+                if k in df.index:
+                    v = df.loc[k, target_col]
+                    if pd.notna(v):
+                        fv = float(v)
+                        return abs(fv) if take_abs else fv
+            return None
+
+        prev_capex = _nth_abs(cf, [
+            "Capital Expenditure", "CapitalExpenditure",
+            "Capital Expenditure Reported",
+        ], col_idx=1, take_abs=True)
+        prev_da = _nth_abs(cf, [
+            "Depreciation And Amortization", "DepreciationAndAmortization",
+            "Depreciation Amortization Depletion",
+            "DepreciationAmortizationDepletion",
+            "Depreciation",
+        ], col_idx=1, take_abs=True)
+
         # 最新期 Current Capital Lease Obligation
         current_lease_ttm = _latest_abs(bs, [
             "Current Capital Lease Obligation",
@@ -1158,6 +1185,9 @@ def get_fcf_components(code: str) -> Optional[dict]:
             "capex_ttm": capex_ttm,
             "da_ttm": da_ttm,
             "current_lease_obligation_ttm": current_lease_ttm,
+            # B33: 上年同期 capex/da（现金流动量）
+            "prev_capex": prev_capex,
+            "prev_da": prev_da,
         }
     except Exception as e:
         logger.warning(f"[{code}] 获取 FCF 组件失败: {e}")
@@ -1575,6 +1605,9 @@ def collect_financial_data(code: str, forward_div_override: Optional[float] = No
         capex_ttm = fcf_comps.get("capex_ttm")
         da_ttm = fcf_comps.get("da_ttm")
         current_lease_obligation_ttm = fcf_comps.get("current_lease_obligation_ttm")
+        # B33: 上年同期 capex/da
+        prev_capex = fcf_comps.get("prev_capex")
+        prev_da = fcf_comps.get("prev_da")
     except Exception as e:
         logger.warning(f"[{code}] fcf_components 采集失败: {e}")
         ocf_3y_avg = None
@@ -1585,6 +1618,8 @@ def collect_financial_data(code: str, forward_div_override: Optional[float] = No
         capex_ttm = None
         da_ttm = None
         current_lease_obligation_ttm = None
+        prev_capex = None
+        prev_da = None
 
     # ── dilution ─────────────────────────────────────────────────
     try:
@@ -1630,6 +1665,8 @@ def collect_financial_data(code: str, forward_div_override: Optional[float] = No
         "capex_ttm": capex_ttm,
         "da_ttm": da_ttm,
         "current_lease_obligation_ttm": current_lease_obligation_ttm,
+        "prev_capex": prev_capex,
+        "prev_da": prev_da,
     }
 
     if forward_div_override is not None:

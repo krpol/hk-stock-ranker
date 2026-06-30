@@ -13,10 +13,10 @@ B31 + B32: 剩余可用现金流偿债覆盖率指标。
 
 评级（原 5 级）：
     AAA      cash_fortress 成立（超级豁免）
-    DROP     real_fcf < 0 或 覆盖率 < 5%
-    WARN     5% ≤ 覆盖率 < 10%
-    OK       10% ≤ 覆盖率 < 20%
-    STRONG   覆盖率 ≥ 20%
+    DROP     real_fcf < 0 或 覆盖率 < 15%
+    WARN     15% ≤ 覆盖率 < 20%
+    OK       20% ≤ 覆盖率 < 100%
+    STRONG   覆盖率 ≥ 100%
     N/A      数据缺失
 
 降级矩阵（B32 突降叠加，AAA/N/A 不降级）：
@@ -30,7 +30,7 @@ EPS_RATIO = 0.01        # 1% × Equity
 EPS_FLOOR = 1e8         # 1 亿港币
 THRESHOLD_DROP = 0.15
 THRESHOLD_WARN = 0.20
-THRESHOLD_OK = 0.30
+THRESHOLD_OK = 1.00
 
 # B32: 突降阈值
 DROP_RATIO_WARN = 0.30   # 当年 < 30% 3y 平均 → 下调一档
