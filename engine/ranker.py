@@ -118,6 +118,7 @@ COLUMN_LABELS = {
     "cash_buffer_zscore": "现金缓冲 Z",
     "cash_buffer_ratio_v2": "现金缓冲比v2",
     "fcf_yield": "FCF收益率",
+    "cash_fortress_factor": "现金堡垒因子",
     "fcf_to_equity": "FCF/净资产",
     "fcf_momentum": "现金流动量",
     "real_fcf_ttm": "TTM剩余CF",
@@ -451,13 +452,13 @@ def rank_stocks(
     for src, dst in zip(GROWTH_COLS, ZSCORE_COLS):
         merged[dst] = _winsorized_zscore(merged[src])
     z_df = merged[ZSCORE_COLS].apply(pd.to_numeric, errors="coerce")
-    # 加权平均：TTM 回报同比权重 ×2，其它子因子权重 1
+    # 加权平均：TTM 回报同比×3.0（主因子）、经营现金流同比×0.5（去重叠）、其余×1.0
     # 用 NaN-safe 加权：sum(w_i * z_i) / sum(w_i for non-NaN)
     GROWTH_WEIGHTS = {
         "growth_zscore_revenue": 1.0,
         "growth_zscore_operating_income": 1.0,
-        "growth_zscore_operating_cashflow": 1.0,
-        "growth_zscore_ttm_return": 2.0,
+        "growth_zscore_operating_cashflow": 0.5,
+        "growth_zscore_ttm_return": 3.0,
         "growth_zscore_fcf_equity": 1.0,
         "growth_zscore_fcf_momentum": 1.0,
     }

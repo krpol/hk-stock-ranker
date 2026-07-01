@@ -362,13 +362,16 @@ def _attach_cashflow_factors(df: pd.DataFrame) -> pd.DataFrame:
     out["fcf_yield_zscore"] = fy_z.fillna(0.0)
 
     # 重算 composite_score
-    #   sust_z × 1.0 + growth × 0.2 + cash_buffer_z_v2 × 0.2 + fcf_yield_z × 0.2
+    # B36: 合并现金堡垒因子 = 0.5 × cash_buffer_v2 + 0.5 × fcf_yield（两项均以 mcap 为分母，同信号融合）
+    #   sust_z × 1.0 + growth × 0.2 + cash_fortress × 0.2
     #   注：growth_factor 已在 ranker 内含 FCF/净资产、现金流动量两个子因子
     srz = pd.to_numeric(sust_z, errors="coerce").fillna(0.0)
     gz = pd.to_numeric(out.get("growth_factor"), errors="coerce").fillna(0.0)
     cbz2 = pd.to_numeric(out["cash_buffer_zscore_v2"], errors="coerce").fillna(0.0)
     fyz = pd.to_numeric(out["fcf_yield_zscore"], errors="coerce").fillna(0.0)
-    out["composite_score"] = (srz * 1.0 + gz * 0.2 + cbz2 * 0.2 + fyz * 0.2).round(4)
+    cash_fortress_factor = (0.5 * cbz2 + 0.5 * fyz).round(4)
+    out["cash_fortress_factor"] = cash_fortress_factor
+    out["composite_score"] = (srz * 1.0 + gz * 0.2 + cash_fortress_factor * 0.2).round(4)
 
 
     # B32-UI v9: 保留 OCF_3y_avg 是否为正的布尔标记（drop 后 filter 仍可用）
