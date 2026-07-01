@@ -1,0 +1,85 @@
+{
+  "generated_at": "2026-07-01T14:59:44",
+  "csv_path": "data/csv/hk_financial.csv",
+  "total_rows": 902,
+  "summary": {
+    "warn": 6,
+    "fail": 0,
+    "total_issues": 6
+  },
+  "issues": [
+    {
+      "dim": "sanity",
+      "severity": "warn",
+      "field": "operating_income_yoy",
+      "kind": "below_range",
+      "detail": "4 只低于下限 -50.0",
+      "sample_codes": [
+        "00535",
+        "01181",
+        "01349",
+        "06677"
+      ],
+      "min": -314.889706
+    },
+    {
+      "dim": "sanity",
+      "severity": "warn",
+      "field": "operating_income_yoy",
+      "kind": "above_range",
+      "detail": "1 只超过上限 50.0",
+      "sample_codes": [
+        "02885"
+      ],
+      "max": 53.781933
+    },
+    {
+      "dim": "sanity",
+      "severity": "warn",
+      "field": "operating_cashflow_yoy",
+      "kind": "below_range",
+      "detail": "1 只低于下限 -50.0",
+      "sample_codes": [
+        "09983"
+      ],
+      "min": -136.929461
+    },
+    {
+      "dim": "sanity",
+      "severity": "warn",
+      "field": "operating_cashflow_yoy",
+      "kind": "above_range",
+      "detail": "5 只超过上限 100.0",
+      "sample_codes": [
+        "00560",
+        "00711",
+        "00842",
+        "08629",
+        "09638"
+      ],
+      "max": 750.382177
+    },
+    {
+      "dim": "sanity",
+      "severity": "warn",
+      "field": "total_liability_ratio",
+      "kind": "above_range",
+      "detail": "1 只超过上限 1.2",
+      "sample_codes": [
+        "01128"
+      ],
+      "max": 1.3328
+    },
+    {
+      "dim": "sanity",
+      "severity": "warn",
+      "field": "debt_to_equity",
+      "kind": "above_range",
+      "detail": "1 只超过上限 10.0",
+      "sample_codes": [
+        "01848"
+      ],
+      "max": 15.2907
+    }
+  ]
+}

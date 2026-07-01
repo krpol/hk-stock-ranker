@@ -37,7 +37,8 @@ DOMAIN_FIELDS: dict = {
     ],
     "debt": ["net_debt_ratio", "total_liability_ratio", "debt_to_equity", "roe", "cash_and_equivalents", "interest_bearing_debt",
              "ocf_3y_avg", "capex_3y_avg", "dep_amortization_3y_avg", "current_lease_obligation_prev", "equity_latest",
-             "capex_ttm", "da_ttm", "current_lease_obligation_ttm", "prev_capex", "prev_da"],
+             "capex_ttm", "da_ttm", "current_lease_obligation_ttm", "prev_capex", "prev_da",
+             "fcf_as_of", "debt_as_of"],
     "dilution": ["annual_dilution_rate"],
     "growth": [
         "ttm_revenue", "prev_ttm_revenue", "ttm_revenue_t2", "revenue_yoy",
@@ -902,44 +903,46 @@ def get_debt_ratios(code: str) -> Optional[dict]:
     try:
         t = _get_ticker(code)
         bs = t.balance_sheet
-        if bs is None or bs.empty:
+        ist = t.income_stmt
+        # B34: 双源 combine（AKShare 优先，yfinance 兜底）
+        ak_bs = _get_hk_report_akshare(code, "资产负债表")
+        ak_is = _get_hk_report_akshare(code, "利润表")
+
+        _as_of_dates: list = []
+
+        def _latest(ak_keys, yf_keys, sum_items=False, src_is=False):
+            yf_df = ist if src_is else bs
+            ak_df = ak_is if src_is else ak_bs
+            seq = _combine_series(
+                _ak_series(ak_df, ak_keys, sum_items=sum_items),
+                _yf_series(yf_df, yf_keys),
+            )
+            if seq:
+                _as_of_dates.append(seq[0][0])
+                return seq[0][1]
             return None
 
-        latest_col = sorted(bs.columns.tolist(), reverse=True)[0]
-
-        def get_val(keys):
-            for k in keys:
-                if k in bs.index:
-                    v = bs.loc[k, latest_col]
-                    if pd.notna(v):
-                        return float(v)
-            return 0.0
-
-        total_assets = get_val(["Total Assets", "TotalAssets"])
-        short_term_debt = get_val([
+        total_assets = _latest(AK_ITEM_MAP["total_assets"],
+                               ["Total Assets", "TotalAssets"]) or 0.0
+        short_term_debt = _latest(AK_ITEM_MAP["short_term_debt"], [
             "Current Debt", "ShortTermDebt",
             "Short Term Debt And Current Portion Of Long Term Debt",
-        ])
-        long_term_debt = get_val([
+        ]) or 0.0
+        long_term_debt = _latest(AK_ITEM_MAP["long_term_debt"], [
             "Long Term Debt", "LongTermDebt",
             "Long Term Debt And Capital Lease Obligation",
-        ])
-        # B3: 总负债（按 yfinance 字段优先级）
-        total_liabilities = get_val([
+        ]) or 0.0
+        total_liabilities = _latest(AK_ITEM_MAP["total_liabilities"], [
             "Total Liabilities Net Minority Interest",
             "TotalLiabilitiesNetMinorityInterest",
-            "Total Liab",
-            "TotalLiab",
-        ])
-        # B19: 净资产（股东权益）
-        total_equity = get_val([
-            "Stockholders Equity",
-            "StockholdersEquity",
+            "Total Liab", "TotalLiab",
+        ]) or 0.0
+        total_equity = _latest(AK_ITEM_MAP["stockholders_equity"], [
+            "Stockholders Equity", "StockholdersEquity",
             "Total Equity Gross Minority Interest",
             "TotalEquityGrossMinorityInterest",
-            "Common Stock Equity",
-            "CommonStockEquity",
-        ])
+            "Common Stock Equity", "CommonStockEquity",
+        ]) or 0.0
         # 兜底：净资产 = 总资产 - 总负债
         if total_equity <= 0 and total_assets > 0 and total_liabilities > 0:
             total_equity = total_assets - total_liabilities
@@ -955,11 +958,9 @@ def get_debt_ratios(code: str) -> Optional[dict]:
             if total_liabilities > 0 else None
         )
         # B29: 现金及等价物（仅纯现金，不含短投，保守口径）
-        cash_and_equivalents = get_val([
-            "Cash And Cash Equivalents",
-            "CashAndCashEquivalents",
-            "Cash",
-        ])
+        cash_and_equivalents = _latest(AK_ITEM_MAP["cash_and_equivalents"], [
+            "Cash And Cash Equivalents", "CashAndCashEquivalents", "Cash",
+        ]) or 0.0
 
         # B19/B32: 净资产缺失或非正时返回 None
         # B32: 改为 Net D/E = max(IBD − Cash, 0) / Equity
@@ -969,27 +970,23 @@ def get_debt_ratios(code: str) -> Optional[dict]:
         )
 
         # B22: ROE = net_income / equity_期末（A 方案）
-        # 最新年报净利润 ÷ 期末净资产
         roe = None
         if total_equity and total_equity > 0:
             try:
-                ist = t.income_stmt
-                if ist is not None and not ist.empty:
-                    # 用 balance_sheet 同一 latest_col 匹配 income_stmt；不完全匹配取 income_stmt 最新列
-                    is_col = latest_col if latest_col in ist.columns else sorted(ist.columns.tolist(), reverse=True)[0]
-                    ni = 0.0
-                    for k in ["Net Income", "NetIncome",
-                              "Net Income Common Stockholders", "NetIncomeCommonStockholders",
-                              "Net Income From Continuing Operation Net Minority Interest"]:
-                        if k in ist.index:
-                            v = ist.loc[k, is_col]
-                            if pd.notna(v):
-                                ni = float(v)
-                                break
-                    if ni != 0.0:
-                        roe = round(ni / total_equity, 4)
+                ni = _latest(AK_ITEM_MAP["net_income"], [
+                    "Net Income", "NetIncome",
+                    "Net Income Common Stockholders", "NetIncomeCommonStockholders",
+                    "Net Income From Continuing Operation Net Minority Interest",
+                ], src_is=True)
+                if ni and ni != 0.0:
+                    roe = round(float(ni) / total_equity, 4)
             except Exception as e:
                 logger.debug(f"[{code}] ROE 计算跳过: {e}")
+        # B35: 数据血缘 —— 资产负债表科目实际使用的最新报告期
+        _debt_as_of = None
+        if _as_of_dates:
+            _debt_as_of = max(_as_of_dates).strftime("%Y-%m-%d")
+
         return {
             "net_debt_ratio": net_debt_ratio,
             "total_liability_ratio": total_liability_ratio,
@@ -997,10 +994,137 @@ def get_debt_ratios(code: str) -> Optional[dict]:
             "roe": roe,
             "cash_and_equivalents": float(cash_and_equivalents) if cash_and_equivalents else None,
             "interest_bearing_debt": float(net_debt) if net_debt else None,
+            "debt_as_of": _debt_as_of,
         }
     except Exception as e:
         logger.warning(f"[{code}] 获取负债率失败: {e}")
         raise  # B16: 让上层 collect_financial_data 标记为 fail
+
+
+# ============================================================================
+# B34: yfinance + AKShare 双源 combine 基础设施
+# ----------------------------------------------------------------------------
+# 问题：yfinance 港股年报严重滞后（如 01995 缺 2025 年报），导致 3 年平均口径
+#       误用含旧崩盘年的过时数据。AKShare「年度」接口更新及时（已含 2025）。
+# 方案：构建「按报告期对齐」的年度科目序列，AKShare 优先、yfinance 兜底，
+#       逐期 union 合并。所有 3y_avg / latest / prev 取值均从合并序列读取。
+# ============================================================================
+
+# 模块级缓存：避免同一 code 多个采集函数重复请求 AKShare（{code: {symbol: df}}）
+_AK_REPORT_CACHE: dict = {}
+
+# AKShare 港股年度报表科目 → 标准字段名映射（多候选名，按优先级）
+# 单位与 yfinance 一致（元）。capex/da/lease 取绝对值由调用方处理。
+AK_ITEM_MAP: dict = {
+    # 现金流量表
+    "operating_cashflow": ["经营业务现金净额"],
+    "capex": ["购建固定资产", "购建无形资产及其他资产"],  # 两项相加
+    "depreciation_amortization": ["折旧及摊销"],
+    "lease_repayment": ["偿还融资租赁"],
+    # 资产负债表
+    "total_assets": ["总资产"],
+    "total_liabilities": ["总负债"],
+    "stockholders_equity": ["股东权益", "总权益"],
+    "cash_and_equivalents": ["现金及等价物"],
+    "current_lease_obligation": ["融资租赁负债(流动)"],
+    "short_term_debt": ["短期贷款", "短期借款", "一年内到期的非流动负债"],
+    "long_term_debt": ["长期贷款", "长期借款"],
+    # 利润表
+    "net_income": ["股东应占溢利", "归属于母公司股东的净利润", "本公司拥有人应占溢利"],
+}
+
+
+def _get_hk_report_akshare(code: str, symbol: str) -> Optional[pd.DataFrame]:
+    """B34: 拉取 AKShare 港股「年度」报表（带模块级缓存）。
+
+    symbol ∈ {"资产负债表", "现金流量表", "利润表"}
+    返回原始 DataFrame（列含 REPORT_DATE / STD_ITEM_NAME / AMOUNT），失败返回 None。
+    """
+    cache_key = symbol
+    if code in _AK_REPORT_CACHE and cache_key in _AK_REPORT_CACHE[code]:
+        return _AK_REPORT_CACHE[code][cache_key]
+    df = None
+    try:
+        import akshare as ak
+        df = ak.stock_financial_hk_report_em(stock=code, symbol=symbol, indicator="年度")
+        if df is None or df.empty:
+            df = None
+    except Exception as e:
+        logger.debug(f"[{code}] AKShare {symbol} 年度拉取失败: {e}")
+        df = None
+    _AK_REPORT_CACHE.setdefault(code, {})[cache_key] = df
+    return df
+
+
+def _ak_series(df: Optional[pd.DataFrame], item_keys, sum_items: bool = False) -> dict:
+    """B34: 从 AKShare 年度 df 提取某科目的 {date(Timestamp): value(float)} 序列。
+
+    item_keys: 候选科目名列表。
+    sum_items=True 时把所有命中的候选科目「相加」（如 capex = 购建固定资产 + 购建无形）；
+    sum_items=False 时按优先级取第一个命中的科目。
+    """
+    if df is None or df.empty or "STD_ITEM_NAME" not in df.columns:
+        return {}
+    out: dict = {}
+    if sum_items:
+        # 对每个候选科目分别取序列，再按日期相加
+        for k in item_keys:
+            sub = df[df["STD_ITEM_NAME"] == k]
+            for _, r in sub.iterrows():
+                d = pd.to_datetime(r.get("REPORT_DATE"), errors="coerce")
+                a = r.get("AMOUNT")
+                if pd.notna(d) and pd.notna(a):
+                    d = pd.Timestamp(d).normalize()
+                    out[d] = out.get(d, 0.0) + float(a)
+        return out
+    # 优先级取第一个命中的科目
+    for k in item_keys:
+        sub = df[df["STD_ITEM_NAME"] == k]
+        if sub.empty:
+            continue
+        for _, r in sub.iterrows():
+            d = pd.to_datetime(r.get("REPORT_DATE"), errors="coerce")
+            a = r.get("AMOUNT")
+            if pd.notna(d) and pd.notna(a):
+                d = pd.Timestamp(d).normalize()
+                if d not in out:
+                    out[d] = float(a)
+        if out:
+            return out
+    return {}
+
+
+def _yf_series(df: Optional[pd.DataFrame], keys) -> dict:
+    """B34: 从 yfinance 报表 df（列=财报日期，行=科目）提取 {date: value} 序列。"""
+    if df is None or df.empty:
+        return {}
+    for k in keys:
+        if k in df.index:
+            out: dict = {}
+            for col in df.columns:
+                v = df.loc[k, col]
+                d = pd.to_datetime(col, errors="coerce")
+                if pd.notna(d) and pd.notna(v):
+                    out[pd.Timestamp(d).normalize()] = float(v)
+            if out:
+                return out
+    return {}
+
+
+def _combine_series(ak_ser: dict, yf_ser: dict) -> list:
+    """B34: 按报告期 union 合并两源年度序列，AKShare 优先、yfinance 兜底。
+
+    返回按日期降序的 [(Timestamp, value), ...]。
+    用户语义：最新一期通常只有 AKShare 有 → 用 AKShare；
+              更老的某些期可能 AKShare 缺 → 用 yfinance 补。
+    """
+    merged: dict = {}
+    # 先放 yfinance（兜底），再用 AKShare 覆盖（优先）
+    for d, v in (yf_ser or {}).items():
+        merged[d] = v
+    for d, v in (ak_ser or {}).items():
+        merged[d] = v
+    return sorted(merged.items(), key=lambda x: x[0], reverse=True)
 
 
 def get_fcf_components(code: str) -> Optional[dict]:
@@ -1021,159 +1145,112 @@ def get_fcf_components(code: str) -> Optional[dict]:
         t = _get_ticker(code)
         cf = t.cashflow
         bs = t.balance_sheet
-        if cf is None or cf.empty or bs is None or bs.empty:
+        # B34: yfinance 任一缺失不再直接 return None —— AKShare 可独立兜底
+
+        # === B34: 构建双源 combine 年度序列 ===
+        ak_cf = _get_hk_report_akshare(code, "现金流量表")
+        ak_bs = _get_hk_report_akshare(code, "资产负债表")
+
+        # OCF（不取绝对值，保留负号）
+        ocf_seq = _combine_series(
+            _ak_series(ak_cf, AK_ITEM_MAP["operating_cashflow"]),
+            _yf_series(cf, ["Operating Cash Flow", "OperatingCashFlow",
+                            "Cash Flow From Continuing Operating Activities"]),
+        )
+        # CapEx（AKShare 两项相加；yfinance 单科目；统一取绝对值）
+        capex_seq = _combine_series(
+            _ak_series(ak_cf, AK_ITEM_MAP["capex"], sum_items=True),
+            _yf_series(cf, ["Capital Expenditure", "CapitalExpenditure",
+                            "Capital Expenditure Reported"]),
+        )
+        # D&A（取绝对值）
+        da_seq = _combine_series(
+            _ak_series(ak_cf, AK_ITEM_MAP["depreciation_amortization"]),
+            _yf_series(cf, ["Depreciation And Amortization", "DepreciationAndAmortization",
+                            "Depreciation Amortization Depletion",
+                            "DepreciationAmortizationDepletion", "Depreciation"]),
+        )
+        # 净资产（按报表日序列）
+        equity_seq = _combine_series(
+            _ak_series(ak_bs, AK_ITEM_MAP["stockholders_equity"]),
+            _yf_series(bs, ["Stockholders Equity", "StockholdersEquity",
+                            "Total Equity Gross Minority Interest",
+                            "TotalEquityGrossMinorityInterest",
+                            "Common Stock Equity", "CommonStockEquity"]),
+        )
+        # 一年内到期租赁负债（按报表日序列）
+        lease_seq = _combine_series(
+            _ak_series(ak_bs, AK_ITEM_MAP["current_lease_obligation"]),
+            _yf_series(bs, ["Current Capital Lease Obligation",
+                            "CurrentCapitalLeaseObligation"]),
+        )
+        # 兜底净资产用：总资产 / 总负债序列
+        ta_seq = _combine_series(
+            _ak_series(ak_bs, AK_ITEM_MAP["total_assets"]),
+            _yf_series(bs, ["Total Assets", "TotalAssets"]),
+        )
+        tl_seq = _combine_series(
+            _ak_series(ak_bs, AK_ITEM_MAP["total_liabilities"]),
+            _yf_series(bs, ["Total Liabilities Net Minority Interest",
+                            "TotalLiabilitiesNetMinorityInterest",
+                            "Total Liab", "TotalLiab"]),
+        )
+
+        # 全部源都空 → 无数据
+        if not any([ocf_seq, capex_seq, da_seq, equity_seq]):
             return None
 
-        def _avg_abs(df, keys, n=3, take_abs=True):
-            """从 df 取 keys 任一命中行，最近 n 期平均；缺则按可得期数。"""
-            if df is None or df.empty:
+        # === 序列取值工具 ===
+        def _avg_n(seq, n=3, take_abs=False):
+            """取最近 n 期均值。"""
+            if not seq:
                 return None
-            sub = None
-            for k in keys:
-                if k in df.index:
-                    sub = df.loc[k]
-                    break
-            if sub is None:
+            vals = [abs(v) if take_abs else v for _, v in seq[:n]]
+            return sum(vals) / len(vals) if vals else None
+
+        def _nth(seq, idx, take_abs=False):
+            """取第 idx 期值（0=最新, 1=上年）。"""
+            if not seq or len(seq) <= idx:
                 return None
-            vals = []
-            cols = list(df.columns)
-            for col in cols[:n]:
-                v = sub.get(col)
-                if pd.notna(v):
-                    fv = float(v)
-                    if take_abs:
-                        fv = abs(fv)
-                    vals.append(fv)
-            if not vals:
-                return None
-            return sum(vals) / len(vals)
+            v = seq[idx][1]
+            return abs(v) if take_abs else v
 
-        ocf_3y = _avg_abs(cf, [
-            "Operating Cash Flow", "OperatingCashFlow",
-            "Cash Flow From Continuing Operating Activities",
-        ], n=3, take_abs=False)
+        ocf_3y = _avg_n(ocf_seq, 3, take_abs=False)
+        capex_3y = _avg_n(capex_seq, 3, take_abs=True)
+        dep_3y = _avg_n(da_seq, 3, take_abs=True)
 
-        capex_3y = _avg_abs(cf, [
-            "Capital Expenditure", "CapitalExpenditure",
-            "Capital Expenditure Reported",
-        ], n=3, take_abs=True)
-
-        dep_3y = _avg_abs(cf, [
-            "Depreciation And Amortization", "DepreciationAndAmortization",
-            "Depreciation Amortization Depletion",
-            "DepreciationAmortizationDepletion",
-            "Depreciation",
-        ], n=3, take_abs=True)
-
-        # 期初租赁本金 = 上年报表日 Current Capital Lease Obligation
-        current_lease_prev = None
-        bs_cols = list(bs.columns)
-        if len(bs_cols) >= 2:
-            prev_col = bs_cols[1]
-            for k in ["Current Capital Lease Obligation",
-                      "CurrentCapitalLeaseObligation"]:
-                if k in bs.index:
-                    v = bs.loc[k, prev_col]
-                    if pd.notna(v):
-                        current_lease_prev = float(v)
-                        break
-        # 缺失置 0（多数公司无租赁负债）
+        # 期初租赁本金 = 上年(第2期)报表日的一年内到期租赁负债
+        current_lease_prev = _nth(lease_seq, 1, take_abs=True)
         if current_lease_prev is None:
             current_lease_prev = 0.0
 
         # 最新净资产
-        latest_col = bs_cols[0]
-        def _get_bs(keys, col):
-            for k in keys:
-                if k in bs.index:
-                    v = bs.loc[k, col]
-                    if pd.notna(v):
-                        return float(v)
-            return None
-        equity_latest = _get_bs([
-            "Stockholders Equity", "StockholdersEquity",
-            "Total Equity Gross Minority Interest",
-            "TotalEquityGrossMinorityInterest",
-            "Common Stock Equity", "CommonStockEquity",
-        ], latest_col)
-        # 兜底
+        equity_latest = _nth(equity_seq, 0, take_abs=False)
         if equity_latest is None or equity_latest <= 0:
-            ta = _get_bs(["Total Assets", "TotalAssets"], latest_col) or 0
-            tl = _get_bs([
-                "Total Liabilities Net Minority Interest",
-                "TotalLiabilitiesNetMinorityInterest",
-                "Total Liab", "TotalLiab",
-            ], latest_col) or 0
+            ta = _nth(ta_seq, 0) or 0
+            tl = _nth(tl_seq, 0) or 0
             if ta > 0 and tl > 0:
                 equity_latest = ta - tl
 
-        # 全部缺失则返回 None
-        if all(v is None for v in [ocf_3y, capex_3y, dep_3y]) and (equity_latest is None):
-            return None
+        # B32: TTM (最新一期) 字段
+        capex_ttm = _nth(capex_seq, 0, take_abs=True)
+        da_ttm = _nth(da_seq, 0, take_abs=True)
 
-        # B32: TTM (最新一期) 字段 — 用于突降监测
-        def _latest_abs(df, keys, take_abs=True):
-            """取 df 最新一列(columns[0]) 中 keys 任一命中的值。"""
-            if df is None or df.empty:
-                return None
-            cols = list(df.columns)
-            if not cols:
-                return None
-            latest_col = cols[0]
-            for k in keys:
-                if k in df.index:
-                    v = df.loc[k, latest_col]
-                    if pd.notna(v):
-                        fv = float(v)
-                        return abs(fv) if take_abs else fv
-            return None
-
-        capex_ttm = _latest_abs(cf, [
-            "Capital Expenditure", "CapitalExpenditure",
-            "Capital Expenditure Reported",
-        ], take_abs=True)
-
-        da_ttm = _latest_abs(cf, [
-            "Depreciation And Amortization", "DepreciationAndAmortization",
-            "Depreciation Amortization Depletion",
-            "DepreciationAmortizationDepletion",
-            "Depreciation",
-        ], take_abs=True)
-
-        # B33: 上年同期（年报第 2 列）capex / da，用于 prev_real_fcf_ttm 现金流动量
-        def _nth_abs(df, keys, col_idx, take_abs=True):
-            if df is None or df.empty:
-                return None
-            cols = list(df.columns)
-            if len(cols) <= col_idx:
-                return None
-            target_col = cols[col_idx]
-            for k in keys:
-                if k in df.index:
-                    v = df.loc[k, target_col]
-                    if pd.notna(v):
-                        fv = float(v)
-                        return abs(fv) if take_abs else fv
-            return None
-
-        prev_capex = _nth_abs(cf, [
-            "Capital Expenditure", "CapitalExpenditure",
-            "Capital Expenditure Reported",
-        ], col_idx=1, take_abs=True)
-        prev_da = _nth_abs(cf, [
-            "Depreciation And Amortization", "DepreciationAndAmortization",
-            "Depreciation Amortization Depletion",
-            "DepreciationAmortizationDepletion",
-            "Depreciation",
-        ], col_idx=1, take_abs=True)
+        # B33: 上年同期 capex / da（现金流动量）
+        prev_capex = _nth(capex_seq, 1, take_abs=True)
+        prev_da = _nth(da_seq, 1, take_abs=True)
 
         # 最新期 Current Capital Lease Obligation
-        current_lease_ttm = _latest_abs(bs, [
-            "Current Capital Lease Obligation",
-            "CurrentCapitalLeaseObligation",
-        ], take_abs=False)
+        current_lease_ttm = _nth(lease_seq, 0, take_abs=True)
         if current_lease_ttm is None:
             current_lease_ttm = 0.0
+
+        # B35: 数据血缘 —— 记录 OCF 序列实际使用的最新报告期（时效锚点）
+        _as_of = None
+        if ocf_seq:
+            _as_of = ocf_seq[0][0].strftime("%Y-%m-%d")
+        elif equity_seq:
+            _as_of = equity_seq[0][0].strftime("%Y-%m-%d")
 
         return {
             "ocf_3y_avg": ocf_3y,
@@ -1188,6 +1265,8 @@ def get_fcf_components(code: str) -> Optional[dict]:
             # B33: 上年同期 capex/da（现金流动量）
             "prev_capex": prev_capex,
             "prev_da": prev_da,
+            # B35: 数据血缘
+            "fcf_as_of": _as_of,
         }
     except Exception as e:
         logger.warning(f"[{code}] 获取 FCF 组件失败: {e}")

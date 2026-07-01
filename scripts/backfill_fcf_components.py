@@ -24,14 +24,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 import pandas as pd
 import logging
-from collectors.hk_financial import get_fcf_components
+from collectors.hk_financial import get_fcf_components, get_debt_ratios
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(message)s")
 logger = logging.getLogger(__name__)
 
 CSV_PATH = Path("data/csv/hk_financial.csv")
 
-FIELDS = [
+FCF_FIELDS = [
     "ocf_3y_avg",
     "capex_3y_avg",
     "dep_amortization_3y_avg",
@@ -42,13 +42,32 @@ FIELDS = [
     "current_lease_obligation_ttm",
     "prev_capex",
     "prev_da",
+    "fcf_as_of",
 ]
+
+# B34: 双源 combine 后 debt 字段也需刷新（与 FCF 共享 AKShare 缓存，同一 pass 回填）
+DEBT_FIELDS = [
+    "net_debt_ratio",
+    "total_liability_ratio",
+    "roe",
+    "cash_and_equivalents",
+    "interest_bearing_debt",
+    "debt_as_of",
+]
+
+FIELDS = FCF_FIELDS + DEBT_FIELDS
 
 
 def fetch_one(code: str) -> tuple[str, dict]:
     try:
+        from collectors.hk_financial import _AK_REPORT_CACHE
         comps = get_fcf_components(code) or {}
-        return code, {k: comps.get(k) for k in FIELDS}
+        debt = get_debt_ratios(code) or {}
+        out = {k: comps.get(k) for k in FCF_FIELDS}
+        out.update({k: debt.get(k) for k in DEBT_FIELDS})
+        # 用完即清该 code 缓存，避免多线程下模块级 dict 膨胀/竞态
+        _AK_REPORT_CACHE.pop(code, None)
+        return code, out
     except Exception as e:
         logger.warning(f"[{code}] 回填失败: {e}")
         return code, {}
@@ -108,8 +127,12 @@ def main():
 
     # 统计
     for col in FIELDS:
-        s = pd.to_numeric(df[col], errors="coerce")
-        logger.info(f"  {col}: 非空 {s.notna().sum()} / 总 {len(df)}")
+        if col.endswith("_as_of"):
+            s = df[col].replace("", pd.NA)
+            logger.info(f"  {col}: 非空 {s.notna().sum()} / 总 {len(df)}")
+        else:
+            s = pd.to_numeric(df[col], errors="coerce")
+            logger.info(f"  {col}: 非空 {s.notna().sum()} / 总 {len(df)}")
 
 
 if __name__ == "__main__":
