@@ -301,29 +301,55 @@ def compute_dividend_fields(
     # ---- B17: TTM 分红 = 最新两个半年期相加（半年期归属，方案 A） ----
     # periods 已过滤为 [年报+中报]，按时间从新到旧排序
     past_periods = [p for p in periods if p <= today]
-    if len(past_periods) >= 2:
-        ttm_div = period_sum(past_periods[0]) + period_sum(past_periods[1])
-    elif len(past_periods) == 1:
-        ttm_div = period_sum(past_periods[0])
-    else:
-        ttm_div = 0.0
-    # prev_year_div_per_share = 再往前两期（用于 YoY 分母）
-    if len(past_periods) >= 4:
-        prev_year_div = period_sum(past_periods[2]) + period_sum(past_periods[3])
-    elif len(past_periods) >= 3:
-        prev_year_div = period_sum(past_periods[2])
-    else:
-        prev_year_div = 0.0
-    # two_yrs_ago：再往前两期
-    if len(past_periods) >= 6:
-        two_yrs_ago_div = period_sum(past_periods[4]) + period_sum(past_periods[5])
-    elif len(past_periods) >= 5:
-        two_yrs_ago_div = period_sum(past_periods[4])
-    else:
-        two_yrs_ago_div = 0.0
+
+    # B38 修复：新滚入的 **中报期** 归属分红=0 时，视为「派息尚未除息」而非「不派息」，
+    # 从 TTM 窗口跳过该期，避免 6→7 月中报期越过 today 导致 fy_div 假腰斩。
+    #
+    # 注意：**年报期**归属=0 是港股常态（分红要下一年才除息），不做 shift。
+    #
+    # 判定条件（要同时满足才跳过）：
+    #   1) 有已识别的 interim_md（中报锚点已知）
+    #   2) past_periods 至少 3 期（后面还有真数据）
+    #   3) 最新期 past_periods[0] 是中报期（月日匹配 interim_md）
+    #   4) 该中报期归属分红 = 0
+    #   5) 最新期为「刚过 today 不久」的期（≤ 90 天）——防止真无派息误判
+    #   6) 存在同类型历史中报期且派息>0——防止误伤本来就零派息公司
+    shift = 0
+    if (
+        interim_md is not None
+        and len(past_periods) >= 3
+        and _is_md_match((past_periods[0].month, past_periods[0].day), interim_md)
+        and period_sum(past_periods[0]) == 0.0
+    ):
+        p0 = past_periods[0]
+        days_since = (today - p0).days
+        if 0 <= days_since <= 90:
+            historical_interim = [
+                p for p in past_periods[1:]
+                if _is_md_match((p.month, p.day), interim_md)
+            ]
+            if historical_interim and any(period_sum(p) > 0 for p in historical_interim):
+                shift = 1
+                logger.debug(f"TTM 窗口跳过中报期 {p0}（归属=0，视为派息尚未除息）")
+
+    def _slice_sum(offset: int, count: int) -> float:
+        """从 past_periods[shift+offset] 开始取 count 期求和；不足时取到末尾。"""
+        start = shift + offset
+        end = min(start + count, len(past_periods))
+        if start >= len(past_periods):
+            return 0.0
+        return sum(period_sum(past_periods[i]) for i in range(start, end))
+
+    ttm_div = _slice_sum(0, 2)
+    prev_year_div = _slice_sum(2, 2)
+    two_yrs_ago_div = _slice_sum(4, 2)
 
     # ---- 最近一期财报（任意期，可能是中报） ----
-    latest_period = max((p for p in periods if p <= today), default=None)
+    # B38：同样跳过头部无派息的"财报期到但未除息"期
+    if shift < len(past_periods):
+        latest_period = past_periods[shift]
+    else:
+        latest_period = None
     if latest_period is not None:
         latest_period_div = period_sum(latest_period)
         latest_period_yoy_end = latest_period - pd.DateOffset(years=1)
@@ -356,13 +382,9 @@ def compute_dividend_fields(
         if override_amt > existing_total:
             delta = override_amt - existing_total
             period_pending[current_fy_year_end] = existing_pending + delta
-            # B17: 重算 TTM = 最新两期相加（保持新口径）
-            if len(past_periods) >= 2:
-                ttm_div = period_sum(past_periods[0]) + period_sum(past_periods[1])
-            elif len(past_periods) == 1:
-                ttm_div = period_sum(past_periods[0])
-            if len(past_periods) >= 4:
-                prev_year_div = period_sum(past_periods[2]) + period_sum(past_periods[3])
+            # B17: 重算 TTM = 最新两期相加（保持新口径 + B38 shift）
+            ttm_div = _slice_sum(0, 2)
+            prev_year_div = _slice_sum(2, 2)
             if latest_period is not None:
                 latest_period_div = period_sum(latest_period)
                 if latest_period_yoy_end is not None:

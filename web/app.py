@@ -489,16 +489,25 @@ def _apply_filters(df: pd.DataFrame, filter_div_growth: bool, filter_return_grow
         b = out.get("prev_year_div_per_share")
         c = out.get("latest_period_div_per_share")
         d = out.get("latest_period_yoy_div_per_share")
+        # B38 防御：把 forward_div_per_share（已宣派未除息）纳入 TTM 侧救生，
+        # 避免中报期越过 today 但派息尚未除息造成 fy_div 假下滑
+        fwd = out.get("forward_div_per_share")
+        an = pd.to_numeric(a, errors="coerce").fillna(0) if a is not None else None
+        bn = pd.to_numeric(b, errors="coerce").fillna(0) if b is not None else None
+        fwdn = pd.to_numeric(fwd, errors="coerce").fillna(0) if fwd is not None else None
         # OR 逻辑：只要 TTM 或 最近期 任一不下降就保留；只有两项都下降才剔除
-        ttm_ok = (a.fillna(0) >= b.fillna(0)) if (a is not None and b is not None) else None
+        if an is not None and bn is not None:
+            ttm_ok = an >= bn
+            if fwdn is not None:
+                ttm_ok = ttm_ok | ((an + fwdn) >= bn)  # 加 forward_div 后仍不下降 → 救生
+        else:
+            ttm_ok = None
         latest_ok = (c.fillna(0) >= d.fillna(0)) if (c is not None and d is not None) else None
         # B32-UI: 高股息率救生 - (2*fy_div - prev_year_div) / price >= 15% 仍保留
         # 公式含义：用"今年隐含分红 - 上年分红"近似前瞻派息能力，避免单期高基数误救
         cp = pd.to_numeric(out.get("current_price"), errors="coerce")
         div_yield_ok = None
-        if a is not None and b is not None and cp is not None:
-            an = pd.to_numeric(a, errors="coerce")
-            bn = pd.to_numeric(b, errors="coerce")
+        if an is not None and bn is not None and cp is not None:
             div_yield_ok = ((2 * an - bn) / cp.where(cp > 0)) >= 0.15
             div_yield_ok = div_yield_ok.fillna(False)
         if ttm_ok is not None and latest_ok is not None:
@@ -516,7 +525,18 @@ def _apply_filters(df: pd.DataFrame, filter_div_growth: bool, filter_return_grow
         e = out.get("ttm_return_rate")
         f = out.get("prev_ttm_return_rate")
         if e is not None and f is not None:
-            keep = e.fillna(0) >= f.fillna(0)
+            en = e.fillna(0)
+            fn = f.fillna(0)
+            keep = en >= fn
+            # B38 防御：把 forward_div 折算成回报率增量加回来（救生）
+            # forward_div 是港币每股金额；ttm_return_rate 单位是 %；除以 price 再 *100
+            fwd_col = out.get("forward_div_per_share")
+            cp_col = out.get("current_price")
+            if fwd_col is not None and cp_col is not None:
+                fwd = pd.to_numeric(fwd_col, errors="coerce").fillna(0)
+                cp = pd.to_numeric(cp_col, errors="coerce")
+                fwd_rate = (fwd / cp.where(cp > 0) * 100).fillna(0)
+                keep = keep | ((en + fwd_rate) >= fn)
             # B32-UI: 高回报率救生 - 最新回报/市值 >= 15% 仍保留 (return_rate 已是 % 单位)
             rr = pd.to_numeric(out.get("return_rate"), errors="coerce")
             if rr is not None:
