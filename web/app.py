@@ -476,12 +476,14 @@ def _apply_filters(df: pd.DataFrame, filter_div_growth: bool, filter_return_grow
     # B32-UI: 用户可关闭 cash_fortress 豁免
     if not cash_fortress_exempt:
         cash_fortress_col = pd.Series(False, index=out.index)
-    # B32-UI v8: 净现金为负 (cash − ibd < 0) 时启用严阈值；与 cash_fortress 互斥
-    cb_v2 = pd.to_numeric(out.get("cash_buffer_ratio_v2"), errors="coerce")
-    if cb_v2 is None:
+    # B38: 严档触发改为 FCF 评级 ∈ {OK, WARN, DROP, N/A}（即非 STRONG/AAA）；与 cash_fortress 互斥
+    # 变量名 net_cash_neg_col 保留（下游多处引用），语义已改为「评级 OK 及以下」
+    rating_col = out.get("fcf_rating")
+    if rating_col is None:
         net_cash_neg_col = pd.Series(False, index=out.index)
     else:
-        net_cash_neg_col = (cb_v2 < 0).fillna(False) & ~cash_fortress_col
+        rs = rating_col.astype(str)
+        net_cash_neg_col = rs.isin(["OK", "WARN", "DROP", "N/A"]) & ~cash_fortress_col
     if filter_div_growth:
         a = out.get("fy_div_per_share")
         b = out.get("prev_year_div_per_share")
@@ -534,7 +536,7 @@ def _apply_filters(df: pd.DataFrame, filter_div_growth: bool, filter_return_grow
             nn_col = net_cash_neg_col.reindex(out.index).fillna(False)
             threshold = pd.Series(-0.10, index=out.index)
             threshold[cf_col] = -0.30
-            threshold[nn_col] = 0.0  # 净现金为负：营收不能下降
+            threshold[nn_col] = -0.08  # B38: 评级 OK 及以下：营收降幅 ≤ 8%
             out = out[ryn >= threshold]
     if filter_ocf:
         # 经营现金流 TTM 同比 >= -0.50；现金堡垒豁免放宽到 -0.80；净现金为负收紧到 -0.20；空值剔除
@@ -545,7 +547,7 @@ def _apply_filters(df: pd.DataFrame, filter_div_growth: bool, filter_return_grow
             nn_col = net_cash_neg_col.reindex(out.index).fillna(False)
             threshold = pd.Series(-0.50, index=out.index)
             threshold[cf_col] = -0.80
-            threshold[nn_col] = -0.20
+            threshold[nn_col] = -0.30  # B38: 评级 OK 及以下：OCF 降幅 ≤ 30%
             out = out[cfn.notna() & (cfn >= threshold)]
     if filter_net_debt_hard:
         # B24: 改用 debt_to_equity（有息负债/净资产）≤ 0.70；NaN 保留
@@ -573,7 +575,7 @@ def _apply_filters(df: pd.DataFrame, filter_div_growth: bool, filter_return_grow
             nn_col = net_cash_neg_col.reindex(out.index).fillna(False)
             threshold = pd.Series(-0.35, index=out.index)
             threshold[cf_col] = -1.0
-            threshold[nn_col] = -0.10
+            threshold[nn_col] = -0.20  # B38: 评级 OK 及以下：growth_factor ≥ -0.20
             out = out[~(gf < threshold).fillna(False)]
     if filter_roe_z:
         # B22: 横截面 zscore，剔除 z < -1.8；净现金为负收紧到 z < -1.0；NaN 保留
@@ -587,7 +589,7 @@ def _apply_filters(df: pd.DataFrame, filter_div_growth: bool, filter_return_grow
                 z = (roe_out - mu) / sd
                 nn_col = net_cash_neg_col.reindex(out.index).fillna(False)
                 threshold = pd.Series(-1.8, index=out.index)
-                threshold[nn_col] = -1.0
+                threshold[nn_col] = -1.5  # B38: 评级 OK 及以下：ROE zscore ≥ -1.5
                 out = out[~(z < threshold).fillna(False)]
     if filter_turnover_z:
         # B23: 近 1 年换手率 = volume_365d_sum / shares_outstanding
