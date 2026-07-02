@@ -295,14 +295,8 @@ def _attach_cashflow_factors(df: pd.DataFrame) -> pd.DataFrame:
     sust = sust.where(rfcf_abs.notna() & ~fin_exempt, ret)
     out["sustainable_return_rate"] = sust.round(4)
 
-    # B28: 让 sustainable_return_rate 紧跟 return_rate 显示
-    if "return_rate" in out.columns:
-        cols = list(out.columns)
-        if "sustainable_return_rate" in cols:
-            cols.remove("sustainable_return_rate")
-            idx = cols.index("return_rate") + 1
-            cols.insert(idx, "sustainable_return_rate")
-            out = out[cols]
+    # B28/B37: sustainable_return_rate 紧跟 return_rate；growth_factor/cash_fortress_factor 稍后
+    # 与 return_rate 一起排（cash_fortress_factor 待下方 assign 完再统一 reorder）
 
     # B32: DCC 用 real_fcf 替代 OCF（标普 FCF/Div 口径，更严格）
     real_fcf_series = pd.to_numeric(out["real_fcf"], errors="coerce")
@@ -372,6 +366,21 @@ def _attach_cashflow_factors(df: pd.DataFrame) -> pd.DataFrame:
     cash_fortress_factor = (0.5 * cbz2 + 0.5 * fyz).round(4)
     out["cash_fortress_factor"] = cash_fortress_factor
     out["composite_score"] = (srz * 1.0 + gz * 0.2 + cash_fortress_factor * 0.2).round(4)
+
+    # B37: 将 4 个核心指标连续显示：return_rate → sustainable_return_rate → growth_factor → cash_fortress_factor
+    if "return_rate" in out.columns:
+        cols = list(out.columns)
+        target_cols = ["sustainable_return_rate", "growth_factor", "cash_fortress_factor"]
+        # 先把三列全部移除
+        for c in target_cols:
+            if c in cols:
+                cols.remove(c)
+        # 按顺序插入到 return_rate 右边
+        idx = cols.index("return_rate") + 1
+        for offset, c in enumerate(target_cols):
+            if c in out.columns:
+                cols.insert(idx + offset, c)
+        out = out[cols]
 
 
     # B32-UI v9: 保留 OCF_3y_avg 是否为正的布尔标记（drop 后 filter 仍可用）
