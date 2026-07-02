@@ -96,12 +96,31 @@ def backfill_one_month(period: str, stock_list: pd.DataFrame,
     # 替换 current_price 为该月月底价（缺失则保留原值，避免误删）
     new_price = fin["code"].map(month_prices)
     coverage = new_price.notna().sum() / max(len(fin), 1)
-    fin["current_price"] = new_price.fillna(fin.get("current_price"))
 
-    # 仅保留有月底价的股票（覆盖率不足时跳过）
-    fin = fin[new_price.notna()].reset_index(drop=True)
+    # B37: 当月无价时，用 price_wide 中该 code 最近一个月的价格作为 fallback（最新可用价）
+    # 背景：AKShare 限流导致当月部分 code 拉不到价；用最近月度价保持股票可参与排名
+    other_periods = [p for p in price_wide.index if p != period]
+    fallback_price = pd.Series(dtype=float, index=fin.index)
+    if other_periods:
+        latest_prior = max(other_periods)
+        prior_prices = price_wide.loc[latest_prior]
+        fallback_price = fin["code"].map(prior_prices)
+
+    fin["current_price"] = new_price.fillna(fallback_price).fillna(fin.get("current_price"))
+
+    # 只剔除「当月无价 + fallback 也无价 + 原始 current_price 也无价」的股票
+    has_any_price = new_price.notna() | fallback_price.notna() | fin["current_price"].notna()
+    used_new = new_price.notna().sum()
+    used_fallback = (new_price.isna() & fallback_price.notna()).sum()
+    used_orig = (new_price.isna() & fallback_price.isna() & fin["current_price"].notna()).sum()
+    logger.info(
+        f"  {period} 当月月底价: {used_new} 只; "
+        f"fallback 至 {latest_prior if other_periods else 'N/A'}: {used_fallback} 只; "
+        f"原始 current_price: {used_orig} 只"
+    )
+    fin = fin[has_any_price].reset_index(drop=True)
     if fin.empty:
-        logger.warning(f"  {period} 无任何股票有月底价，跳过")
+        logger.warning(f"  {period} 无任何股票有价格（当月+fallback+原始 均缺），跳过")
         return False
 
     # 限制 fin 到所选 stock_list（年度池）以收敛 ranking
