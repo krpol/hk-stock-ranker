@@ -112,12 +112,12 @@
             <input type="checkbox" name="fdcc" value="1" onchange="this.form.submit()" {% if filter_dividend_coverage %}checked{% endif %}>
             分红现金覆盖≥1
         </label>
-        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="勾选时：现金堡垒公司（cash − ibd > 市值）在 CC/DCC/Net D/E硬阈值 等过滤器中豁免（默认行为）。&#10;取消时：关闭豁免，所有公司一视同仁按硬规则砍。">
+        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="勾选时：现金堡垒公司（cash − ibd > 市值）在 CC/DCC/Net D/E硬阈值 等过滤器中豁免（默认行为）。&#10;取消时：关闭豁免，所有公司一视同仁按硬规则砍。&#10;&#10;B38：现金堡垒自动豁免严档（即 frv/focf/fgf/froez 仍用宽松阈值，不会收紧）">
             <input type="hidden" name="fcfx" value="0">
             <input type="checkbox" name="fcfx" value="1" onchange="this.form.submit()" {% if cash_fortress_exempt %}checked{% endif %}>
             现金堡垒豁免
         </label>
-        <span style="font-size:0.88rem;display:flex;align-items:center;gap:5px;" title="FCF 评级多选（不勾任何 = 不限）。&#10;STRONG: real_fcf>0 且覆盖率≥30%&#10;OK: real_fcf>0 且覆盖率 20-30%&#10;WARN: real_fcf>0 且覆盖率 15-20%&#10;DROP: real_fcf<0 或覆盖率<15%&#10;AAA: 现金堡垒（自动）&#10;N/A: 数据缺失">
+        <span style="font-size:0.88rem;display:flex;align-items:center;gap:5px;" title="FCF 评级多选（不勾任何 = 不限）。&#10;STRONG: real_fcf>0 且覆盖率≥30%&#10;OK: real_fcf>0 且覆盖率 20-30%&#10;WARN: real_fcf>0 且覆盖率 15-20%&#10;DROP: real_fcf<0 或覆盖率<15%&#10;AAA: 现金堡垒（自动）&#10;N/A: 数据缺失&#10;&#10;B38 严档：评级 OK/WARN/DROP/N/A 会触发多过滤器阈值收紧（frv -8%、focf -30%、fgf -0.20、froez -1.5）；AAA/STRONG 豁免严档">
             评级:
             {% for r in ["STRONG","OK","WARN","DROP","AAA","N/A"] %}
             <label style="display:flex;align-items:center;gap:2px;cursor:pointer;">
@@ -125,7 +125,7 @@
             </label>
             {% endfor %}
         </span>
-        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="动量过滤（3 条任一命中即剔除）：&#10;  - 加权动量因子 mom_factor > 2&#10;  - 6 月动量 z_mom6 < -3 （6月深跌）&#10;  - 1 月动量 z_mom1 > 2.0 （1月过热）&#10;加权公式：mom_factor=(1·z1+2·z3+1·z6+1·z9)/5">
+        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="动量过滤（3 条任一命中即剔除）：&#10;  - 加权动量因子 mom_factor > 2&#10;  - 6 月动量 z_mom6 < -3 （6月深跌）&#10;  - 1 月动量 z_mom1 > 2.0 （1月过热）&#10;加权公式（B36）：mom_factor=(1·z1+2·z3+1·z6+1·z9)/5">
             <input type="checkbox" name="fmom" value="1" onchange="this.form.submit()" {% if filter_momentum %}checked{% endif %}>
             动量过滤
         </label>
