@@ -499,21 +499,14 @@ def _apply_filters(df: pd.DataFrame, filter_div_growth: bool, filter_return_grow
         # OR 逻辑：只要 TTM 或 最近期 任一不下降就保留；只有两项都下降才剔除
         ttm_ok = (an >= bn) if (an is not None and bn is not None) else None
         # B39-r3 修复：latest 双 0（缺数据）视为无效，不参与救生，避免“无数据默认通过”
-        # B39-r5: latest 侧对称方案
-        #   上年 yoy = latest_period_yoy_div（历史数据必已派发，直接用）
-        #   本期 latest：仅当 latest_period_end 在当前 fy 内（≤ current_fy_end）时，
-        #     forward 才归属于 latest（补齐已宣未派）；
-        #     否则 latest 已是新财年下一期，forward 属于已结束的旧 fy，不归 latest。
+        # B39-r6: latest = latest_period_div + forward_div（已宣派 看成 已派发，无需日期判断）
+        #   上年 yoy = latest_period_yoy_div（历史必已派发，直接用）
         fwd = out.get("forward_div_per_share")
         fwdn = pd.to_numeric(fwd, errors="coerce").fillna(0) if fwd is not None else None
-        lpe = pd.to_datetime(out.get("latest_period_end"), errors="coerce")
-        cfe = pd.to_datetime(out.get("current_fy_end"), errors="coerce")
-        latest_in_fy = (lpe.notna() & cfe.notna() & (lpe <= cfe)) if (lpe is not None and cfe is not None) else pd.Series(False, index=out.index)
         if c is not None and d is not None:
             cn = pd.to_numeric(c, errors="coerce").fillna(0)
             dn = pd.to_numeric(d, errors="coerce").fillna(0)
-            fwd_for_latest = (fwdn if fwdn is not None else 0)
-            cn_eff = cn + (latest_in_fy.astype(float) * fwd_for_latest if hasattr(latest_in_fy, 'astype') else 0)
+            cn_eff = cn + (fwdn if fwdn is not None else 0)
             has_data = (cn_eff > 0) | (dn > 0)
             latest_ok = has_data & (cn_eff >= dn)
         else:
@@ -946,14 +939,11 @@ def _diagnose_stock(row: pd.Series, df_full: pd.DataFrame) -> list:
     cp = _num(row.get("current_price"))
     results = []
 
-    # fdg: 分红同比不下降（B39-r5：本期 latest 仅当仍在当前 fy 内时补齐 forward）
+    # fdg: 分红同比不下降（B39-r6：本期 latest = latest + forward；上年 yoy 直接用）
     a0 = a or 0; b0 = b or 0
     ttm_ok = a0 >= b0
     c0 = c or 0; d0 = d or 0
-    lpe_s = str(row.get("latest_period_end", "") or "")
-    cfe_s = str(row.get("current_fy_end", "") or "")
-    latest_in_fy = bool(lpe_s and cfe_s and lpe_s <= cfe_s)
-    c0_eff = c0 + (fwd if latest_in_fy else 0)
+    c0_eff = c0 + fwd  # 已宣派 看成 已派发
     latest_has_data = (c0_eff > 0) or (d0 > 0)
     latest_ok = latest_has_data and (c0_eff >= d0)
     div_yield_ok = (cp and cp > 0 and ((2 * a0 - b0) / cp) >= 0.15) if a is not None else False
@@ -962,8 +952,7 @@ def _diagnose_stock(row: pd.Series, df_full: pd.DataFrame) -> list:
     if ttm_ok: _note += "ttm_ok "
     if latest_ok: _note += f"latest_ok(eff={c0_eff:.3f}) "
     if div_yield_ok: _note += "yield≥15% "
-    if not latest_in_fy and fwd > 0: _note += "fwd_out_of_fy "
-    elif not latest_has_data: _note += "latest_no_data "
+    if not latest_has_data: _note += "latest_no_data "
     results.append({
         "key": "fdg", "name": "分红同比不下降",
         "pass": fdg_pass,
