@@ -271,10 +271,11 @@ def _attach_cashflow_factors(df: pd.DataFrame) -> pd.DataFrame:
     out["real_fcf_ttm"] = real_fcf_ttm_vals
     out["drop_ratio"] = drop_ratio_vals
 
-    # B27 → B32-UI: sustainable_return_rate = (capped_fy_div + real_buyback) / current_price - dilution
-    # 封顶：fy_div_per_share 不得超过 (3y real_fcf + 净现金 × 10%) / 股本
+    # B27 → B32-UI → B39: sustainable_return_rate = capped_payout / current_price - dilution
+    # 封顶：fy_div + real_buyback 合计不得超过 (3y real_fcf + 净现金 × 10%) / 股本
     #   含义：3 年真 FCF 是可持续来源；净现金按 10% 折现/年化补贴 = 用现金垫付 10 年的容忍度
-    # 负值 → 0（直接砍光分红）；金融行业 / 3y OCF 缺失 → 回退到 return_rate
+    #   B39: 分红 + 回购 一起被 cap 盖住 —— 回购同样吃现金，不能借回购绕过 FCF 上限
+    # 负值 → 0（直接砍光派息）；金融行业 / 3y OCF 缺失 → 回退到 return_rate
     ind = out.get("industry").astype(str) if "industry" in out.columns else pd.Series("", index=out.index)
     fin_exempt = ind.isin(_FIN_INDUSTRY_EXEMPT)
     rfcf_abs = pd.to_numeric(out["real_fcf"], errors="coerce")          # 绝对值（3y 平均）
@@ -285,11 +286,13 @@ def _attach_cashflow_factors(df: pd.DataFrame) -> pd.DataFrame:
     cap_per_share = cap_total / shs.where(shs > 0)
     cap = cap_per_share.clip(lower=0)                                    # 负 → 0
     fy_div_ps = pd.to_numeric(out.get("fy_div_per_share"), errors="coerce").fillna(0)
-    capped_fy_div = pd.concat([fy_div_ps, cap], axis=1).min(axis=1)
     rb = pd.to_numeric(out.get("real_buyback_per_share"), errors="coerce").fillna(0)
+    # B39: 分红 + 回购 合计一起被 cap 盖住（回购同样吃现金，不能绕过 FCF 上限）
+    payout_ps = fy_div_ps + rb
+    capped_payout = pd.concat([payout_ps, cap], axis=1).min(axis=1)
     cp_for_sust = pd.to_numeric(out.get("current_price"), errors="coerce")
     dil = pd.to_numeric(out.get("annual_dilution_rate"), errors="coerce").fillna(0)
-    sust = (capped_fy_div + rb) / cp_for_sust.where(cp_for_sust > 0) * 100 - dil * 100
+    sust = capped_payout / cp_for_sust.where(cp_for_sust > 0) * 100 - dil * 100
     # 豁免回退到 return_rate
     ret = pd.to_numeric(out.get("return_rate"), errors="coerce")
     sust = sust.where(rfcf_abs.notna() & ~fin_exempt, ret)
@@ -813,6 +816,14 @@ def index():
         page_df = page_df.drop(columns=["real_fcf"])
     if "real_fcf_ttm" in page_df.columns:
         page_df = page_df.drop(columns=["real_fcf_ttm"])
+
+    # B39: 把「剩余CF(亿)」和「FCF评级」移到「现金堡垒因子」之后，方便查看
+    move_cols = ["real_fcf_yi", "fcf_rating"]
+    existing_move = [c for c in move_cols if c in page_df.columns]
+    if existing_move and "cash_fortress_factor" in page_df.columns:
+        other_cols = [c for c in page_df.columns if c not in existing_move]
+        idx = other_cols.index("cash_fortress_factor")
+        page_df = page_df[other_cols[:idx + 1] + existing_move + other_cols[idx + 1:]]
 
     display_df = rename_for_display(page_df) if not page_df.empty else page_df
 
