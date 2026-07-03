@@ -51,7 +51,7 @@
 <header>
     <div>
         <h1>🇭🇰 港股回报率排名</h1>
-        <div class="subtitle">回报率 = (财年分红 + 预分红 + 财年回购) / 当前收盘价</div>
+        <div class="subtitle">回报率 = (财年分红 + 真实回购) / 当前收盘价 × 100 − 年化稀释率 × 100</div>
     </div>
     <div style="font-size:0.8rem;opacity:0.7;">数据来源：AKShare · Yahoo Finance &nbsp;|&nbsp; <a href="/backtest" style="color:#9bc2ff;text-decoration:none;font-weight:600;">📊 回测</a></div>
 </header>
@@ -64,11 +64,11 @@
             <option value="{{ p }}" {% if p == selected_period %}selected{% endif %}>{{ p }}</option>
             {% endfor %}
         </select>
-        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="保留 TTM分红 ≥ 上年TTM分红 或 最近期分红 ≥ 同期上年分红（任一不降即保留）&#10;救生条件：(2×fy_div_per_share − prev_year_div_per_share) / current_price ≥ 15% 仍保留">
+        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="保留 TTM分红 ≥ 上年TTM分红 或 最近期分红 ≥ 同期上年分红（任一不降即保留）&#10;救生条件：&#10;  ① (2×fy_div_per_share − prev_year_div_per_share) / current_price ≥ 15%&#10;  ② B38: fy_div + forward_div（已宣派未除息）≥ prev_year_div 仍保留">
             <input type="checkbox" name="fdg" value="1" onchange="this.form.submit()" {% if filter_div_growth %}checked{% endif %}>
             分红同比不下降
         </label>
-        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="剩 TTM回报 ≥ 上年TTM回报&#10;救生条件：最新 return_rate ≥ 15% 仍保留">
+        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="剩 TTM回报 ≥ 上年TTM回报&#10;救生条件：&#10;  ① 最新 return_rate ≥ 15%&#10;  ② B38: ttm_return + forward_div折算回报率 ≥ prev_ttm_return 仍保留">
             <input type="checkbox" name="frg" value="1" onchange="this.form.submit()" {% if filter_return_growth %}checked{% endif %}>
             回报同比不下降
         </label>
@@ -76,19 +76,19 @@
             <input type="checkbox" name="frb" value="1" onchange="this.form.submit()" {% if filter_real_buyback %}checked{% endif %}>
             真实回购
         </label>
-        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="保留 TTM营收同比 ≥ -10%（下降不超过 10%；空值被剔除）&#10;现金堡垒公司放宽到 ≥ -30%&#10;净现金<0（cash−ibd<0）收紧到 ≥ 0%【营收不能下降】">
+        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="保留 TTM营收同比 ≥ -10%（下降不超过 10%；空值被剔除）&#10;现金堡垒公司放宽到 ≥ -30%&#10;B38 严档：FCF 评级 OK/WARN/DROP/N/A 收紧到 ≥ -8%（营收降幅 ≤ 8%）">
             <input type="checkbox" name="frv" value="1" onchange="this.form.submit()" {% if filter_revenue %}checked{% endif %}>
             营收降幅≤10%
         </label>
-        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="保留 经营现金流 TTM 同比 ≥ -50%（减少不超过 50%；空值被剔除）&#10;现金堡垒公司放宽到 ≥ -80%&#10;净现金<0 收紧到 ≥ -20%">
+        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="保留 经营现金流 TTM 同比 ≥ -50%（减少不超过 50%；空值被剔除）&#10;现金堡垒公司放宽到 ≥ -80%&#10;B38 严档：FCF 评级 OK/WARN/DROP/N/A 收紧到 ≥ -30%">
             <input type="checkbox" name="focf" value="1" onchange="this.form.submit()" {% if filter_ocf %}checked{% endif %}>
             现金流降幅≤50%
         </label>
-        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="剔除 成长因子(growth_factor) < -0.35（加权 zscore 复合得分：revenue/operating_income/operating_cashflow 权重 1，ttm_return 权重 2；NaN 保留）&#10;现金堡垒公司放宽到 < -1.0&#10;净现金<0 收紧到 < -0.10">
+        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="剔除 成长因子(growth_factor) < -0.35（加权 zscore 复合得分：revenue/operating_income/operating_cashflow 权重 1，ttm_return 权重 2；NaN 保留）&#10;现金堡垒公司放宽到 < -1.0&#10;B38 严档：FCF 评级 OK/WARN/DROP/N/A 收紧到 < -0.20">
             <input type="checkbox" name="fgf" value="1" onchange="this.form.submit()" {% if filter_growth_factor %}checked{% endif %}>
             成长因子 ≥ -0.35
         </label>
-        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="剔除 ROE 横截面 z<-1.8（ROE 显著低于均值 1.8σ）；NaN 保留&#10;净现金<0 收紧到 z<-1.0">
+        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="剔除 ROE 横截面 z<-1.8（ROE 显著低于均值 1.8σ）；NaN 保留&#10;B38 严档：FCF 评级 OK/WARN/DROP/N/A 收紧到 z<-1.5">
             <input type="checkbox" name="froez" value="1" onchange="this.form.submit()" {% if filter_roe_z %}checked{% endif %}>
             ROE z≥-1.8
         </label>
@@ -239,9 +239,27 @@
                             let bg = '', mark = '—', color = '#888';
                             if(c.pass === true){ mark = '✓'; color = '#15803d'; }
                             else if(c.pass === false){ mark = '✗'; color = '#c00'; bg = 'background:#fef2f2;'; }
+                            const tipMap = {
+                                '分红同比不下降': '保留 TTM分红 ≥ 上年TTM分红 或 最近期分红 ≥ 同期上年分红\\n救生：分红率≥15% 或 fy_div+forward_div≥prev_year_div',
+                                '回报同比不下降': '保留 TTM回报 ≥ 上年TTM回报\\n救生：return_rate≥15% 或 ttm_return+forward_div折算≥prev_ttm_return',
+                                '真实回购(股本净变化≥0)': '保留 net_share_change_rate ≥ 0（排除被 SBC 增发抵消的伪回购）',
+                                '营收降幅': '保留 revenue_yoy ≥ -10%\\n现金堡垒放宽到 -30%；B38 严档（评级OK及以下）收紧到 -8%',
+                                'OCF 降幅': '保留 operating_cashflow_yoy ≥ -50%（空值剔除）\\n现金堡垒放宽到 -80%；B38 严档收紧到 -30%',
+                                '成长因子': '保留 growth_factor ≥ -0.35\\n现金堡垒放宽到 -1.0；B38 严档收紧到 -0.20',
+                                'ROE z': '保留 ROE 横截面 z ≥ -1.8（NaN 保留）\\nB38 严档收紧到 z ≥ -1.5',
+                                '有息负债/净资产≤70%': '保留 debt_to_equity ≤ 70%（硬阈值，空值保留）\\n现金堡垒豁免',
+                                '有息负债/净资产 z≤1.2': '剔除 debt_to_equity 横截面 z > 1.2（杠杆显著高于均值 1.2σ；空值保留）',
+                                '现金转化率≥0.5': '保留 3年平均 OCF / 3年平均营业利润 ≥ 0.5\\n银行/保险/其他金融/投资公司豁免；现金堡垒需同时 OCF_3y_avg > 0',
+                                '分红现金覆盖≥1': '三条件同时满足才砍：FCF/市值≤8% 且 3yDCC<1 且 TTM覆盖<1\\n豁免：非派息/金融/现金堡垒且可分配覆盖',
+                                'FCF 评级': 'AAA=现金堡垒 | STRONG≥30% | OK 20-30% | WARN 15-20% | DROP <15%或real_fcf<0 | N/A 缺失\\nB38：评级 OK/WARN/DROP/N/A 触发严档（多过滤器阈值收紧）',
+                                '≤3年低×3': '保留 当前股价 ≤ 3年(36月)最低收盘价 × 3（避免追高；空价剔除）',
+                                '≤6月低×1.6': '保留 当前股价 ≤ 6月最低收盘价 × 1.6',
+                                '≤2月低×1.25': '保留 当前股价 ≤ 2月最低收盘价 × 1.25',
+                            };
+                            const tip = tipMap[c.name] || '';
                             return `<tr style="${bg}border-bottom:1px solid #f0f2f6;">
                                 <td style="padding:4px 8px;color:${color};font-weight:700;">${mark}</td>
-                                <td style="padding:4px 8px;color:${color};">${c.name}</td>
+                                <td style="padding:4px 8px;color:${color};" title="${tip}">${c.name}</td>
                                 <td style="padding:4px 8px;font-family:monospace;font-size:0.82rem;">${c.value || '—'}</td>
                                 <td style="padding:4px 8px;font-family:monospace;font-size:0.82rem;color:#666;">${c.threshold || ''}</td>
                                 <td style="padding:4px 8px;color:#666;">${c.note || ''}</td>
