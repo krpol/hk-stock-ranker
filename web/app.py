@@ -499,11 +499,20 @@ def _apply_filters(df: pd.DataFrame, filter_div_growth: bool, filter_return_grow
         # OR 逻辑：只要 TTM 或 最近期 任一不下降就保留；只有两项都下降才剔除
         ttm_ok = (an >= bn) if (an is not None and bn is not None) else None
         # B39-r3 修复：latest 双 0（缺数据）视为无效，不参与救生，避免“无数据默认通过”
+        # B39-r4: 已宣派 = TTM 窗口推进；采集侧未把 forward 回填到 latest，且无 prev_forward。
+        #   当 forward_div > 0（本期已宣派）：latest 不参与判定（避免不对称救生），交给 ttm_ok
+        #   否则：latest 双 0（缺数据）视为无效，避免无数据默认通过
+        fwd = out.get("forward_div_per_share")
+        fwdn = pd.to_numeric(fwd, errors="coerce").fillna(0) if fwd is not None else None
         if c is not None and d is not None:
             cn = pd.to_numeric(c, errors="coerce").fillna(0)
             dn = pd.to_numeric(d, errors="coerce").fillna(0)
             has_data = (cn > 0) | (dn > 0)
-            latest_ok = (cn >= dn) & has_data
+            if fwdn is not None:
+                has_declared = fwdn > 0
+                latest_ok = (~has_declared) & has_data & (cn >= dn)
+            else:
+                latest_ok = has_data & (cn >= dn)
         else:
             latest_ok = None
         # B32-UI: 高股息率救生 - (2*fy_div - prev_year_div) / price >= 15% 仍保留
@@ -934,19 +943,26 @@ def _diagnose_stock(row: pd.Series, df_full: pd.DataFrame) -> list:
     cp = _num(row.get("current_price"))
     results = []
 
-    # fdg: 分红同比不下降（B39-r3：取消 fwd 加法救生；latest 双 0 不参与）
+    # fdg: 分红同比不下降（B39-r4：取消 fwd 加法救生；已宣派时 latest 不参与）
     a0 = a or 0; b0 = b or 0
     ttm_ok = a0 >= b0
     c0 = c or 0; d0 = d or 0
+    has_declared = fwd > 0
     latest_has_data = (c0 > 0) or (d0 > 0)
-    latest_ok = latest_has_data and (c0 >= d0)
+    latest_ok = (not has_declared) and latest_has_data and (c0 >= d0)
     div_yield_ok = (cp and cp > 0 and ((2 * a0 - b0) / cp) >= 0.15) if a is not None else False
     fdg_pass = ttm_ok or latest_ok or bool(div_yield_ok)
+    _note = ""
+    if ttm_ok: _note += "ttm_ok "
+    if latest_ok: _note += "latest_ok "
+    if div_yield_ok: _note += "yield≥15% "
+    if has_declared: _note += "declared(latest_skip) "
+    elif not latest_has_data: _note += "latest_no_data "
     results.append({
         "key": "fdg", "name": "分红同比不下降",
         "pass": fdg_pass,
         "value": f"fy={_fmt(a,digit=3)} prev={_fmt(b,digit=3)} fwd={_fmt(fwd,digit=3)} latest={_fmt(c,digit=3)} yoy={_fmt(d,digit=3)}",
-        "note": ("ttm_ok" if ttm_ok else "") + (" latest_ok" if latest_ok else "") + (" yield≥15%" if div_yield_ok else "") + ("" if latest_has_data else " latest_no_data"),
+        "note": _note.strip(),
     })
 
     # frg: 回报同比不下降
