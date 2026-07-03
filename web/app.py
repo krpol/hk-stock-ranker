@@ -530,17 +530,10 @@ def _apply_filters(df: pd.DataFrame, filter_div_growth: bool, filter_return_grow
         if e is not None and f is not None:
             en = e.fillna(0)
             fn = f.fillna(0)
+            # B39-r3 语义修正：已宣派 = TTM 窗口推进，ttm_return_rate / prev_ttm_return_rate
+            #   都已含宣派分红，无需再加 forward_div 救生（重复计算）
             keep = en >= fn
-            # B38 防御：把 forward_div 折算成回报率增量加回来（救生）
-            # forward_div 是港币每股金额；ttm_return_rate 单位是 %；除以 price 再 *100
-            fwd_col = out.get("forward_div_per_share")
-            cp_col = out.get("current_price")
-            if fwd_col is not None and cp_col is not None:
-                fwd = pd.to_numeric(fwd_col, errors="coerce").fillna(0)
-                cp = pd.to_numeric(cp_col, errors="coerce")
-                fwd_rate = (fwd / cp.where(cp > 0) * 100).fillna(0)
-                keep = keep | ((en + fwd_rate) >= fn)
-            # B32-UI: 高回报率救生 - 最新回报/市值 >= 15% 仍保留 (return_rate 已是 % 单位)
+            # 保留高回报率救生（与 forward_div 无关）：return_rate >= 15%
             rr = pd.to_numeric(out.get("return_rate"), errors="coerce")
             if rr is not None:
                 keep = keep | (rr >= 15).fillna(False)
@@ -961,13 +954,15 @@ def _diagnose_stock(row: pd.Series, df_full: pd.DataFrame) -> list:
     f = _num(row.get("prev_ttm_return_rate"))
     rr = _num(row.get("return_rate"))
     en = e or 0; fn = f or 0
-    fwd_rate = (fwd / cp * 100) if (cp and cp > 0) else 0
-    frg_pass = (en >= fn) or ((en + fwd_rate) >= fn) or (rr is not None and rr >= 15)
+    # B39-r3: 已宣派 = TTM 窗口推进（ttm/prev_ttm 都已含），移除 forward_div 加法救生
+    ttm_ok_r = en >= fn
+    rr_high_ok = (rr is not None and rr >= 15)
+    frg_pass = ttm_ok_r or rr_high_ok
     results.append({
         "key": "frg", "name": "回报同比不下降",
         "pass": frg_pass,
         "value": f"ttm={_fmt(e)} prev={_fmt(f)} rr={_fmt(rr)}",
-        "note": "",
+        "note": ("ttm_ok" if ttm_ok_r else "") + (" rr≥15%" if rr_high_ok else ""),
     })
 
     # frb: 真实回购
