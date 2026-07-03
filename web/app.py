@@ -817,8 +817,9 @@ def index():
     if "real_fcf_ttm" in page_df.columns:
         page_df = page_df.drop(columns=["real_fcf_ttm"])
 
-    # B39: 把「剩余CF(亿)」和「FCF评级」移到「现金堡垒因子」之后，方便查看
-    move_cols = ["real_fcf_yi", "fcf_rating"]
+    # B39: 把「FCF收益率」和「FCF评级」移到「现金堡垒因子」之后，方便查看
+    # 「剩余CF(亿)」和「FCF收益率」调换：FCF收益率靠前，剩余CF(亿) 沉到 fcf_yield 原位置
+    move_cols = ["fcf_yield", "fcf_rating"]
     existing_move = [c for c in move_cols if c in page_df.columns]
     if existing_move and "cash_fortress_factor" in page_df.columns:
         other_cols = [c for c in page_df.columns if c not in existing_move]

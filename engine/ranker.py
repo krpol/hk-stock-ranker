@@ -430,25 +430,25 @@ def rank_stocks(
     merged["fcf_to_equity"] = (real_fcf_ttm / _eq_pos).round(4)
     merged["fcf_momentum"] = ((real_fcf_ttm - prev_real_fcf_ttm) / _eq_pos).round(4)
 
-    # B39: 从增长因子中移除 operating_income_yoy 和 operating_cashflow_yoy
-    #   理由：营业利润受一次性/会计口径扰动大；经营现金流已由 fcf_to_equity / fcf_momentum 覆盖
-    #   保留列本身仍在 merged（数据不丢），只是不再参与 growth_factor 加权
-    _AUX_YOY = ["operating_income_yoy", "operating_cashflow_yoy"]
+    # B39-r2: 移除 operating_cashflow_yoy（已由 fcf_to_equity / fcf_momentum 覆盖）
+    #         保留 operating_income_yoy —— 营业利润同比反映主业盈利趋势，与营收/回报角度互补
+    _AUX_YOY = ["operating_cashflow_yoy"]
     for col in _AUX_YOY:
         if col not in merged.columns:
             merged[col] = pd.NA
     # 兼容旧 zscore 列名（外部可能引用），置 NaN 表示不参与计算
-    for dst in ["growth_zscore_operating_income", "growth_zscore_operating_cashflow"]:
-        merged[dst] = pd.NA
+    merged["growth_zscore_operating_cashflow"] = pd.NA
 
     GROWTH_COLS = [
         "revenue_yoy",
+        "operating_income_yoy",
         "ttm_return_yoy",
         "fcf_to_equity",
         "fcf_momentum",
     ]
     ZSCORE_COLS = [
         "growth_zscore_revenue",
+        "growth_zscore_operating_income",
         "growth_zscore_ttm_return",
         "growth_zscore_fcf_equity",
         "growth_zscore_fcf_momentum",
@@ -459,10 +459,11 @@ def rank_stocks(
     for src, dst in zip(GROWTH_COLS, ZSCORE_COLS):
         merged[dst] = _winsorized_zscore(merged[src])
     z_df = merged[ZSCORE_COLS].apply(pd.to_numeric, errors="coerce")
-    # B39: 加权平均 —— TTM 回报同比×3.0（主因子），其余×1.0
+    # B39-r2: 加权平均 —— TTM 回报同比×3.0（主因子），其余×1.0
     # 用 NaN-safe 加权：sum(w_i * z_i) / sum(w_i for non-NaN)
     GROWTH_WEIGHTS = {
         "growth_zscore_revenue": 1.0,
+        "growth_zscore_operating_income": 1.0,
         "growth_zscore_ttm_return": 3.0,
         "growth_zscore_fcf_equity": 1.0,
         "growth_zscore_fcf_momentum": 1.0,
