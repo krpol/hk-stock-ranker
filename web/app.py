@@ -492,20 +492,20 @@ def _apply_filters(df: pd.DataFrame, filter_div_growth: bool, filter_return_grow
         b = out.get("prev_year_div_per_share")
         c = out.get("latest_period_div_per_share")
         d = out.get("latest_period_yoy_div_per_share")
-        # B38 防御：把 forward_div_per_share（已宣派未除息）纳入 TTM 侧救生，
-        # 避免中报期越过 today 但派息尚未除息造成 fy_div 假下滑
-        fwd = out.get("forward_div_per_share")
+        # B39-r3 语义修正：forward_div 已宣未派 视为已派，本应已计入 fy_div_per_share。
+        #   不再做「an + fwdn >= bn」加法救生（那是重复计算），避免金融街物业类假通过。
         an = pd.to_numeric(a, errors="coerce").fillna(0) if a is not None else None
         bn = pd.to_numeric(b, errors="coerce").fillna(0) if b is not None else None
-        fwdn = pd.to_numeric(fwd, errors="coerce").fillna(0) if fwd is not None else None
         # OR 逻辑：只要 TTM 或 最近期 任一不下降就保留；只有两项都下降才剔除
-        if an is not None and bn is not None:
-            ttm_ok = an >= bn
-            if fwdn is not None:
-                ttm_ok = ttm_ok | ((an + fwdn) >= bn)  # 加 forward_div 后仍不下降 → 救生
+        ttm_ok = (an >= bn) if (an is not None and bn is not None) else None
+        # B39-r3 修复：latest 双 0（缺数据）视为无效，不参与救生，避免“无数据默认通过”
+        if c is not None and d is not None:
+            cn = pd.to_numeric(c, errors="coerce").fillna(0)
+            dn = pd.to_numeric(d, errors="coerce").fillna(0)
+            has_data = (cn > 0) | (dn > 0)
+            latest_ok = (cn >= dn) & has_data
         else:
-            ttm_ok = None
-        latest_ok = (c.fillna(0) >= d.fillna(0)) if (c is not None and d is not None) else None
+            latest_ok = None
         # B32-UI: 高股息率救生 - (2*fy_div - prev_year_div) / price >= 15% 仍保留
         # 公式含义：用"今年隐含分红 - 上年分红"近似前瞻派息能力，避免单期高基数误救
         cp = pd.to_numeric(out.get("current_price"), errors="coerce")
@@ -941,17 +941,19 @@ def _diagnose_stock(row: pd.Series, df_full: pd.DataFrame) -> list:
     cp = _num(row.get("current_price"))
     results = []
 
-    # fdg: 分红同比不下降
+    # fdg: 分红同比不下降（B39-r3：取消 fwd 加法救生；latest 双 0 不参与）
     a0 = a or 0; b0 = b or 0
-    ttm_ok = a0 >= b0 or (a0 + fwd) >= b0
-    latest_ok = (c is not None and d is not None and c >= d)
+    ttm_ok = a0 >= b0
+    c0 = c or 0; d0 = d or 0
+    latest_has_data = (c0 > 0) or (d0 > 0)
+    latest_ok = latest_has_data and (c0 >= d0)
     div_yield_ok = (cp and cp > 0 and ((2 * a0 - b0) / cp) >= 0.15) if a is not None else False
     fdg_pass = ttm_ok or latest_ok or bool(div_yield_ok)
     results.append({
         "key": "fdg", "name": "分红同比不下降",
         "pass": fdg_pass,
         "value": f"fy={_fmt(a,digit=3)} prev={_fmt(b,digit=3)} fwd={_fmt(fwd,digit=3)} latest={_fmt(c,digit=3)} yoy={_fmt(d,digit=3)}",
-        "note": ("ttm_ok" if ttm_ok else "") + (" latest_ok" if latest_ok else "") + (" yield≥15%" if div_yield_ok else ""),
+        "note": ("ttm_ok" if ttm_ok else "") + (" latest_ok" if latest_ok else "") + (" yield≥15%" if div_yield_ok else "") + ("" if latest_has_data else " latest_no_data"),
     })
 
     # frg: 回报同比不下降
