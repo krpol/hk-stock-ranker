@@ -158,6 +158,109 @@
     {% endif %}
 </div>
 
+<!-- 搜索诊断 -->
+<div style="padding:10px 24px;background:#fff;border-bottom:1px solid #e8eaf0;display:flex;gap:10px;align-items:center;">
+    <input id="diag-q" type="text" placeholder="搜索股票（代码或名称）..." style="padding:7px 12px;border:1px solid #ccc;border-radius:6px;width:280px;font-size:0.9rem;">
+    <button type="button" id="diag-btn" style="background:#f59e0b;">🔍 诊断过滤原因</button>
+    <span style="font-size:0.82rem;color:#888;">按每个过滤器展示通过/剔除；红色标记表示会被剔除</span>
+</div>
+
+<!-- 诊断结果 Modal -->
+<div id="diag-modal" style="display:none;position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.55);z-index:9999;align-items:center;justify-content:center;">
+    <div style="background:#fff;border-radius:10px;max-width:1000px;width:92%;max-height:88vh;overflow:auto;box-shadow:0 8px 40px rgba(0,0,0,0.3);">
+        <div style="padding:14px 22px;border-bottom:1px solid #e8eaf0;display:flex;justify-content:space-between;align-items:center;background:#1a2744;color:white;border-radius:10px 10px 0 0;">
+            <div style="font-size:1.05rem;font-weight:600;">🔍 股票过滤诊断</div>
+            <button type="button" id="diag-close" style="background:transparent;color:white;border:1px solid rgba(255,255,255,0.4);padding:4px 12px;">✕ 关闭</button>
+        </div>
+        <div id="diag-body" style="padding:18px 22px;">加载中...</div>
+    </div>
+</div>
+
+<script>
+(function(){
+    const q = document.getElementById('diag-q');
+    const btn = document.getElementById('diag-btn');
+    const modal = document.getElementById('diag-modal');
+    const body = document.getElementById('diag-body');
+    const close = document.getElementById('diag-close');
+    const period = "{{ selected_period }}";
+    function open(){ modal.style.display = 'flex'; }
+    function hide(){ modal.style.display = 'none'; }
+    close.onclick = hide;
+    modal.onclick = function(e){ if(e.target === modal) hide(); };
+    async function run(){
+        const query = (q.value || '').trim();
+        if(!query){ q.focus(); return; }
+        open();
+        body.innerHTML = '<div style="text-align:center;color:#888;padding:30px;">查询中...</div>';
+        try{
+            const res = await fetch(`/api/diagnose?period=${encodeURIComponent(period)}&q=${encodeURIComponent(query)}`);
+            const data = await res.json();
+            if(data.error){ body.innerHTML = `<div style="color:#c00;">错误：${data.error}</div>`; return; }
+            if(!data.matches || data.matches.length === 0){
+                body.innerHTML = `<div style="padding:24px;text-align:center;color:#888;">未找到匹配「${query}」的股票（股票池 ${data.total_pool} 只）</div>`;
+                return;
+            }
+            let html = `<div style="margin-bottom:12px;font-size:0.88rem;color:#666;">找到 ${data.matches.length} 只股票 · 期间 ${data.period} · 股票池 ${data.total_pool}</div>`;
+            data.matches.forEach(m => {
+                const failed = m.checks.filter(c => c.pass === false);
+                const passed = m.checks.filter(c => c.pass === true);
+                const na = m.checks.filter(c => c.pass === null);
+                html += `
+                <div style="border:1px solid #e0e4ea;border-radius:8px;padding:14px;margin-bottom:14px;background:#fbfcfe;">
+                    <div style="display:flex;gap:14px;align-items:baseline;flex-wrap:wrap;margin-bottom:8px;">
+                        <div style="font-size:1.08rem;font-weight:600;color:#1a2744;">
+                            ${m.code} · ${m.name || '—'}
+                        </div>
+                        <div style="font-size:0.82rem;color:#666;">${m.industry || ''}</div>
+                        <div style="margin-left:auto;font-size:0.85rem;color:#444;">
+                            排名 <b>${m.rank ?? '—'}</b> ·
+                            综合分 <b>${m.composite_score != null ? m.composite_score.toFixed(3) : '—'}</b> ·
+                            回报 <b>${m.return_rate != null ? m.return_rate.toFixed(2)+'%' : '—'}</b> ·
+                            可持续 <b>${m.sustainable_return_rate != null ? m.sustainable_return_rate.toFixed(2)+'%' : '—'}</b> ·
+                            价 <b>${m.current_price != null ? m.current_price.toFixed(2) : '—'}</b> ·
+                            评级 <b style="color:${m.fcf_rating==='AAA'||m.fcf_rating==='STRONG'?'#15803d':(m.fcf_rating==='DROP'?'#c00':'#666')};">${m.fcf_rating || '—'}</b>
+                            ${m.cash_fortress ? '<span style="color:#15803d;">🛡堡垒</span>' : ''}
+                        </div>
+                    </div>
+                    <div style="font-size:0.82rem;color:${failed.length? '#c00':'#15803d'};margin-bottom:6px;">
+                        通过 ${passed.length} · 剔除 <b>${failed.length}</b> · 不适用 ${na.length}
+                    </div>
+                    <table style="width:100%;border-collapse:collapse;font-size:0.85rem;">
+                        <thead><tr style="background:#eef2f7;">
+                            <th style="text-align:left;padding:5px 8px;width:20px;"></th>
+                            <th style="text-align:left;padding:5px 8px;">过滤器</th>
+                            <th style="text-align:left;padding:5px 8px;">值</th>
+                            <th style="text-align:left;padding:5px 8px;">阈值</th>
+                            <th style="text-align:left;padding:5px 8px;">备注</th>
+                        </tr></thead>
+                        <tbody>
+                        ${m.checks.map(c => {
+                            let bg = '', mark = '—', color = '#888';
+                            if(c.pass === true){ mark = '✓'; color = '#15803d'; }
+                            else if(c.pass === false){ mark = '✗'; color = '#c00'; bg = 'background:#fef2f2;'; }
+                            return `<tr style="${bg}border-bottom:1px solid #f0f2f6;">
+                                <td style="padding:4px 8px;color:${color};font-weight:700;">${mark}</td>
+                                <td style="padding:4px 8px;color:${color};">${c.name}</td>
+                                <td style="padding:4px 8px;font-family:monospace;font-size:0.82rem;">${c.value || '—'}</td>
+                                <td style="padding:4px 8px;font-family:monospace;font-size:0.82rem;color:#666;">${c.threshold || ''}</td>
+                                <td style="padding:4px 8px;color:#666;">${c.note || ''}</td>
+                            </tr>`;
+                        }).join('')}
+                        </tbody>
+                    </table>
+                </div>`;
+            });
+            body.innerHTML = html;
+        }catch(err){
+            body.innerHTML = `<div style="color:#c00;">请求失败：${err.message}</div>`;
+        }
+    }
+    btn.onclick = run;
+    q.addEventListener('keydown', e => { if(e.key === 'Enter'){ e.preventDefault(); run(); } });
+})();
+</script>
+
 {% if total > 0 %}
 <div class="summary">
     共 <strong>{{ total }}</strong> 只股票

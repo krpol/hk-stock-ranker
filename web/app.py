@@ -897,6 +897,252 @@ def api_ranking():
     })
 
 
+def _diagnose_stock(row: pd.Series, df_full: pd.DataFrame) -> list:
+    """对单只股票逐个过滤器诊断，返回 [{key, name, pass, value, threshold, note}]。
+    pass=True 表示"该过滤器不会剔除它"（保留通过）；False 会被剔除；None=不适用/数据缺失。
+    """
+    import numpy as np
+
+    def _num(v):
+        try:
+            f = float(v)
+            return f if not np.isnan(f) else None
+        except Exception:
+            return None
+
+    def _fmt(v, pct=False, digit=2):
+        if v is None:
+            return "—"
+        if pct:
+            return f"{v*100:.{digit}f}%"
+        return f"{v:.{digit}f}"
+
+    cf = bool(row.get("_cash_fortress", False))
+    rating = str(row.get("fcf_rating", "")) if pd.notna(row.get("fcf_rating", None)) else ""
+    strict = (rating in ("OK", "WARN", "DROP", "N/A")) and not cf  # 严档触发（B38）
+
+    a = _num(row.get("fy_div_per_share"))
+    b = _num(row.get("prev_year_div_per_share"))
+    c = _num(row.get("latest_period_div_per_share"))
+    d = _num(row.get("latest_period_yoy_div_per_share"))
+    fwd = _num(row.get("forward_div_per_share")) or 0.0
+    cp = _num(row.get("current_price"))
+    results = []
+
+    # fdg: 分红同比不下降
+    a0 = a or 0; b0 = b or 0
+    ttm_ok = a0 >= b0 or (a0 + fwd) >= b0
+    latest_ok = (c is not None and d is not None and c >= d)
+    div_yield_ok = (cp and cp > 0 and ((2 * a0 - b0) / cp) >= 0.15) if a is not None else False
+    fdg_pass = ttm_ok or latest_ok or bool(div_yield_ok)
+    results.append({
+        "key": "fdg", "name": "分红同比不下降",
+        "pass": fdg_pass,
+        "value": f"fy={_fmt(a,digit=3)} prev={_fmt(b,digit=3)} fwd={_fmt(fwd,digit=3)} latest={_fmt(c,digit=3)} yoy={_fmt(d,digit=3)}",
+        "note": ("ttm_ok" if ttm_ok else "") + (" latest_ok" if latest_ok else "") + (" yield≥15%" if div_yield_ok else ""),
+    })
+
+    # frg: 回报同比不下降
+    e = _num(row.get("ttm_return_rate"))
+    f = _num(row.get("prev_ttm_return_rate"))
+    rr = _num(row.get("return_rate"))
+    en = e or 0; fn = f or 0
+    fwd_rate = (fwd / cp * 100) if (cp and cp > 0) else 0
+    frg_pass = (en >= fn) or ((en + fwd_rate) >= fn) or (rr is not None and rr >= 15)
+    results.append({
+        "key": "frg", "name": "回报同比不下降",
+        "pass": frg_pass,
+        "value": f"ttm={_fmt(e)} prev={_fmt(f)} rr={_fmt(rr)}",
+        "note": "",
+    })
+
+    # frb: 真实回购
+    nsc = _num(row.get("net_share_change_rate"))
+    frb_pass = (nsc is None) or (nsc >= 0)
+    results.append({
+        "key": "frb", "name": "真实回购(股本净变化≥0)", "pass": frb_pass,
+        "value": _fmt(nsc), "note": "",
+    })
+
+    # frv: 营收降幅
+    ry = _num(row.get("revenue_yoy"))
+    th_rv = -0.30 if cf else (-0.08 if strict else -0.10)
+    frv_pass = (ry is None) or (ry >= th_rv)
+    results.append({
+        "key": "frv", "name": "营收降幅", "pass": frv_pass,
+        "value": _fmt(ry, pct=True), "threshold": f"≥{_fmt(th_rv,pct=True)}",
+        "note": "严档" if strict else ("堡垒" if cf else ""),
+    })
+
+    # focf: 现金流降幅
+    ocy = _num(row.get("operating_cashflow_yoy"))
+    th_ocf = -0.80 if cf else (-0.30 if strict else -0.50)
+    focf_pass = (ocy is not None) and (ocy >= th_ocf)
+    results.append({
+        "key": "focf", "name": "OCF 降幅", "pass": focf_pass,
+        "value": _fmt(ocy, pct=True), "threshold": f"≥{_fmt(th_ocf,pct=True)}",
+        "note": ("空值剔除" if ocy is None else ("严档" if strict else ("堡垒" if cf else ""))),
+    })
+
+    # fgf: growth_factor
+    gf = _num(row.get("growth_factor"))
+    th_gf = -1.0 if cf else (-0.20 if strict else -0.35)
+    fgf_pass = (gf is None) or (gf >= th_gf)
+    results.append({
+        "key": "fgf", "name": "成长因子", "pass": fgf_pass,
+        "value": _fmt(gf, digit=3), "threshold": f"≥{th_gf:.2f}",
+        "note": "严档" if strict else ("堡垒" if cf else ""),
+    })
+
+    # froez: ROE z
+    roe_all = pd.to_numeric(df_full.get("roe"), errors="coerce")
+    roe_v = _num(row.get("roe"))
+    mu = float(roe_all.mean(skipna=True)) if roe_all is not None else None
+    sd = float(roe_all.std(skipna=True, ddof=0)) if roe_all is not None else None
+    z_roe = ((roe_v - mu) / sd) if (roe_v is not None and mu is not None and sd) else None
+    th_roez = -1.5 if strict else -1.8
+    froez_pass = (z_roe is None) or (z_roe >= th_roez)
+    results.append({
+        "key": "froez", "name": "ROE z", "pass": froez_pass,
+        "value": _fmt(z_roe, digit=2), "threshold": f"≥{th_roez}",
+        "note": "严档" if strict else "",
+    })
+
+    # fnd: debt_to_equity ≤ 70%
+    de = _num(row.get("debt_to_equity"))
+    fnd_pass = cf or (de is None) or (de <= 0.70)
+    results.append({
+        "key": "fnd", "name": "有息负债/净资产≤70%", "pass": fnd_pass,
+        "value": _fmt(de, pct=True), "threshold": "≤70%",
+        "note": "堡垒豁免" if cf else "",
+    })
+
+    # fndz: debt_to_equity z ≤ 1.2
+    de_all = pd.to_numeric(df_full.get("debt_to_equity"), errors="coerce")
+    mu_d = float(de_all.mean(skipna=True)) if de_all is not None else None
+    sd_d = float(de_all.std(skipna=True, ddof=0)) if de_all is not None else None
+    z_de = ((de - mu_d) / sd_d) if (de is not None and mu_d is not None and sd_d) else None
+    fndz_pass = (z_de is None) or (z_de <= 1.2)
+    results.append({
+        "key": "fndz", "name": "有息负债/净资产 z≤1.2", "pass": fndz_pass,
+        "value": _fmt(z_de, digit=2), "threshold": "≤1.2", "note": "",
+    })
+
+    # fcc: cash_conversion ≥ 0.5
+    cc = _num(row.get("cash_conversion"))
+    ind = str(row.get("industry", "")) if pd.notna(row.get("industry", None)) else ""
+    fin_exempt = ind in _FIN_INDUSTRY_EXEMPT
+    ocf3y_pos = bool(row.get("_ocf_3y_pos", False)) if "_ocf_3y_pos" in row.index else False
+    fcc_pass = fin_exempt or (cf and ocf3y_pos) or (cc is None) or (cc >= 0.5)
+    results.append({
+        "key": "fcc", "name": "现金转化率≥0.5", "pass": fcc_pass,
+        "value": _fmt(cc), "threshold": "≥0.5",
+        "note": ("金融豁免" if fin_exempt else ("堡垒豁免" if (cf and ocf3y_pos) else "")),
+    })
+
+    # fdcc: 分红现金覆盖
+    rfcf = _num(row.get("real_fcf"))
+    rfcf_ttm = _num(row.get("real_fcf_ttm"))
+    shs = _num(row.get("shares_outstanding")) or 0
+    fyd = _num(row.get("fy_div_per_share")) or 0
+    mcap = (cp * shs) if (cp and shs) else None
+    cond1 = (rfcf is not None and mcap and mcap > 0 and rfcf / mcap <= 0.08)
+    dcc3y = _num(row.get("dividend_coverage"))
+    cond2 = (dcc3y is not None and dcc3y < 1.0)
+    ann_div = fyd * shs
+    cond3 = (rfcf_ttm is not None and ann_div > 0 and rfcf_ttm / ann_div < 1.0)
+    would_drop = (not fin_exempt) and cond1 and cond2 and cond3
+    # 简化：不重算完整豁免（只在诊断时提示）
+    fdcc_pass = not would_drop
+    results.append({
+        "key": "fdcc", "name": "分红现金覆盖≥1", "pass": fdcc_pass,
+        "value": f"3yDCC={_fmt(dcc3y)} FCF/mcap={_fmt(rfcf/mcap*100,digit=1) if (rfcf is not None and mcap) else '—'}%",
+        "note": ("金融豁免" if fin_exempt else ("三条件同触发" if would_drop else "")),
+    })
+
+    # 评级过滤（不基于开关，只显示当前评级）
+    results.append({
+        "key": "rating", "name": "FCF 评级", "pass": True,
+        "value": rating or "—", "note": ("AAA=堡垒" if cf else ""),
+    })
+
+    # f3l/f6l/f2l: 相对低点倍数
+    latest_map = _load_latest_qfq_map()
+    code = str(row.get("code", "")).zfill(5) if row.get("code") is not None else ""
+    for months, mult, key, name in [(36, 3.0, "f3l", "≤3年低×3"), (6, 1.6, "f6l", "≤6月低×1.6"), (2, 1.25, "f2l", "≤2月低×1.25")]:
+        lm = _load_low_map(months)
+        low = lm.get(code) if code else None
+        latest = latest_map.get(code) if code else None
+        p = None
+        val = "—"
+        if low and latest and low > 0:
+            p = latest <= low * mult
+            val = f"{latest:.2f} / (低{low:.2f}×{mult})"
+        results.append({
+            "key": key, "name": name, "pass": p if p is not None else None,
+            "value": val, "note": "",
+        })
+
+    return results
+
+
+@app.route("/api/diagnose")
+def api_diagnose():
+    """搜索股票并诊断每个过滤器的判定
+    参数：period=YYYY-MM, q=<code或名称片段>
+    """
+    period = request.args.get("period")
+    q = (request.args.get("q") or "").strip()
+    periods = list_ranking_periods()
+    if not period:
+        period = periods[0] if periods else None
+    if not period:
+        return jsonify({"error": "no data"}), 404
+    if not q:
+        return jsonify({"error": "missing q"}), 400
+
+    df = load_ranking(period)
+    if df.empty:
+        return jsonify({"period": period, "matches": [], "total_pool": 0})
+    df = _attach_cashflow_factors(df)
+    total_pool = len(df)
+
+    # 模糊匹配：code 前 5 位（含 0 pad）或名称包含
+    q_norm = q.zfill(5) if q.isdigit() else q
+    codes = df["code"].astype(str).str.zfill(5) if "code" in df.columns else pd.Series([""] * len(df))
+    name_col = df.get("name")
+    name_str = name_col.astype(str) if name_col is not None else pd.Series([""] * len(df))
+    mask = codes.str.contains(q_norm, case=False, na=False) | name_str.str.contains(q, case=False, na=False)
+    hits = df[mask].head(20)
+
+    matches = []
+    for _, row in hits.iterrows():
+        checks = _diagnose_stock(row, df)
+        matches.append({
+            "code": str(row.get("code", "")).zfill(5),
+            "name": str(row.get("name", "")),
+            "industry": str(row.get("industry", "")) if pd.notna(row.get("industry", None)) else "",
+            "rank": int(row["rank"]) if "rank" in row.index and pd.notna(row["rank"]) else None,
+            "composite_score": float(row["composite_score"]) if "composite_score" in row.index and pd.notna(row["composite_score"]) else None,
+            "return_rate": float(row["return_rate"]) if "return_rate" in row.index and pd.notna(row["return_rate"]) else None,
+            "sustainable_return_rate": float(row["sustainable_return_rate"]) if "sustainable_return_rate" in row.index and pd.notna(row["sustainable_return_rate"]) else None,
+            "current_price": float(row["current_price"]) if "current_price" in row.index and pd.notna(row["current_price"]) else None,
+            "fcf_rating": str(row.get("fcf_rating", "")) if pd.notna(row.get("fcf_rating", None)) else "",
+            "cash_fortress": bool(row.get("_cash_fortress", False)),
+            "checks": checks,
+        })
+    return jsonify({"period": period, "query": q, "total_pool": total_pool, "matches": matches})
+
+
+def _num(v):  # 顶层辅助
+    import numpy as np
+    try:
+        f = float(v)
+        return f if not np.isnan(f) else None
+    except Exception:
+        return None
+
+
 @app.route("/download/<period>")
 def download_excel(period):
     """下载 Excel 文件"""
