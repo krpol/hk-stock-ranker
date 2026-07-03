@@ -499,16 +499,15 @@ def _apply_filters(df: pd.DataFrame, filter_div_growth: bool, filter_return_grow
         # OR 逻辑：只要 TTM 或 最近期 任一不下降就保留；只有两项都下降才剔除
         ttm_ok = (an >= bn) if (an is not None and bn is not None) else None
         # B39-r3 修复：latest 双 0（缺数据）视为无效，不参与救生，避免“无数据默认通过”
-        # B39-r6: latest = latest_period_div + forward_div（已宣派 看成 已派发，无需日期判断）
-        #   上年 yoy = latest_period_yoy_div（历史必已派发，直接用）
-        fwd = out.get("forward_div_per_share")
-        fwdn = pd.to_numeric(fwd, errors="coerce").fillna(0) if fwd is not None else None
+        # B39-r7: 采集层已将 forward 合并到 latest_period_div（当 latest 命中该财报期）：
+        #   - 继城管理 09979: latest_period_end=2025-12-31=fy_end → latest=0.154=forward ✓已合并
+        #   - 金融街物业 01502: latest_period_end=2026-06-30 跨到下一 fy→latest=0 forward 属上一 fy 末期 不同期
+        #   因此 Web 层不再重复补齐（避免双计）；只保留 latest 双 0 不参与救生的门槛
         if c is not None and d is not None:
             cn = pd.to_numeric(c, errors="coerce").fillna(0)
             dn = pd.to_numeric(d, errors="coerce").fillna(0)
-            cn_eff = cn + (fwdn if fwdn is not None else 0)
-            has_data = (cn_eff > 0) | (dn > 0)
-            latest_ok = has_data & (cn_eff >= dn)
+            has_data = (cn > 0) | (dn > 0)
+            latest_ok = has_data & (cn >= dn)
         else:
             latest_ok = None
         # B32-UI: 高股息率救生 - (2*fy_div - prev_year_div) / price >= 15% 仍保留
@@ -939,18 +938,17 @@ def _diagnose_stock(row: pd.Series, df_full: pd.DataFrame) -> list:
     cp = _num(row.get("current_price"))
     results = []
 
-    # fdg: 分红同比不下降（B39-r6：本期 latest = latest + forward；上年 yoy 直接用）
+    # fdg: 分红同比不下降（B39-r7：采集层已合并 forward→latest，Web 不再补齐）
     a0 = a or 0; b0 = b or 0
     ttm_ok = a0 >= b0
     c0 = c or 0; d0 = d or 0
-    c0_eff = c0 + fwd  # 已宣派 看成 已派发
-    latest_has_data = (c0_eff > 0) or (d0 > 0)
-    latest_ok = latest_has_data and (c0_eff >= d0)
+    latest_has_data = (c0 > 0) or (d0 > 0)
+    latest_ok = latest_has_data and (c0 >= d0)
     div_yield_ok = (cp and cp > 0 and ((2 * a0 - b0) / cp) >= 0.15) if a is not None else False
     fdg_pass = ttm_ok or latest_ok or bool(div_yield_ok)
     _note = ""
     if ttm_ok: _note += "ttm_ok "
-    if latest_ok: _note += f"latest_ok(eff={c0_eff:.3f}) "
+    if latest_ok: _note += "latest_ok "
     if div_yield_ok: _note += "yield≥15% "
     if not latest_has_data: _note += "latest_no_data "
     results.append({
