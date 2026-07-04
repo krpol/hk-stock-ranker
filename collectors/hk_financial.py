@@ -36,6 +36,7 @@ DOMAIN_FIELDS: dict = {
         "splits_ratio_in_window", "splits_ratio_calculated",
     ],
     "debt": ["net_debt_ratio", "total_liability_ratio", "debt_to_equity", "roe", "cash_and_equivalents", "interest_bearing_debt",
+             "prev_cash_and_equivalents", "prev_interest_bearing_debt",
              "ocf_3y_avg", "capex_3y_avg", "dep_amortization_3y_avg", "current_lease_obligation_prev", "equity_latest",
              "capex_ttm", "da_ttm", "current_lease_obligation_ttm", "prev_capex", "prev_da",
              "fcf_as_of", "debt_as_of"],
@@ -922,6 +923,18 @@ def get_debt_ratios(code: str) -> Optional[dict]:
                 return seq[0][1]
             return None
 
+        def _prev(ak_keys, yf_keys, sum_items=False, src_is=False):
+            """获取序列第 2 期（上年）的值，缺失返回 None。"""
+            yf_df = ist if src_is else bs
+            ak_df = ak_is if src_is else ak_bs
+            seq = _combine_series(
+                _ak_series(ak_df, ak_keys, sum_items=sum_items),
+                _yf_series(yf_df, yf_keys),
+            )
+            if len(seq) > 1:
+                return seq[1][1]
+            return None
+
         total_assets = _latest(AK_ITEM_MAP["total_assets"],
                                ["Total Assets", "TotalAssets"]) or 0.0
         short_term_debt = _latest(AK_ITEM_MAP["short_term_debt"], [
@@ -961,6 +974,23 @@ def get_debt_ratios(code: str) -> Optional[dict]:
         cash_and_equivalents = _latest(AK_ITEM_MAP["cash_and_equivalents"], [
             "Cash And Cash Equivalents", "CashAndCashEquivalents", "Cash",
         ]) or 0.0
+        # B40: 上年现金及有息负债（用于净现金变化率）
+        _prev_cash_raw = _prev(AK_ITEM_MAP["cash_and_equivalents"], [
+            "Cash And Cash Equivalents", "CashAndCashEquivalents", "Cash",
+        ])
+        _prev_std = _prev(AK_ITEM_MAP["short_term_debt"], [
+            "Current Debt", "ShortTermDebt",
+            "Short Term Debt And Current Portion Of Long Term Debt",
+        ])
+        _prev_ltd = _prev(AK_ITEM_MAP["long_term_debt"], [
+            "Long Term Debt", "LongTermDebt",
+            "Long Term Debt And Capital Lease Obligation",
+        ])
+        prev_cash_and_equivalents = float(_prev_cash_raw) if _prev_cash_raw is not None else None
+        prev_interest_bearing_debt = (
+            float((_prev_std or 0.0) + (_prev_ltd or 0.0))
+            if (_prev_std is not None or _prev_ltd is not None) else None
+        )
 
         # B19/B32: 净资产缺失或非正时返回 None
         # B32: 改为 Net D/E = max(IBD − Cash, 0) / Equity
@@ -994,6 +1024,8 @@ def get_debt_ratios(code: str) -> Optional[dict]:
             "roe": roe,
             "cash_and_equivalents": float(cash_and_equivalents) if cash_and_equivalents else None,
             "interest_bearing_debt": float(net_debt) if net_debt else None,
+            "prev_cash_and_equivalents": prev_cash_and_equivalents,
+            "prev_interest_bearing_debt": prev_interest_bearing_debt,
             "debt_as_of": _debt_as_of,
         }
     except Exception as e:

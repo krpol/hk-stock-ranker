@@ -57,10 +57,12 @@ OUTPUT_COLUMNS = [
     "growth_zscore_ttm_return",
     "growth_zscore_fcf_equity",
     "growth_zscore_fcf_momentum",
+    "growth_zscore_net_cash_change",
     "real_fcf_ttm",
     "prev_real_fcf_ttm",
     "fcf_to_equity",
     "fcf_momentum",
+    "net_cash_change_rate",
     "growth_factor",
     "cash_buffer_ratio",
     "cash_buffer_zscore",
@@ -132,6 +134,8 @@ COLUMN_LABELS = {
     "growth_zscore_ttm_return": "TTM回报增长 Z",
     "growth_zscore_fcf_equity": "FCF/净资产 Z",
     "growth_zscore_fcf_momentum": "现金流动量 Z",
+    "growth_zscore_net_cash_change": "净现金变化 Z",
+    "net_cash_change_rate": "净现金变化率",
     "growth_factor": "增长因子",
     "pe_ttm": "PE(TTM)",
     "pb": "PB",
@@ -430,6 +434,23 @@ def rank_stocks(
     merged["fcf_to_equity"] = (real_fcf_ttm / _eq_pos).round(4)
     merged["fcf_momentum"] = ((real_fcf_ttm - prev_real_fcf_ttm) / _eq_pos).round(4)
 
+    # --- B40: 净现金变化率 = (净现金当期 - 净现金上年) / equity ---
+    # 净现金 = cash_and_equivalents - interest_bearing_debt
+    _cash = _num("cash_and_equivalents")
+    _ibd  = _num("interest_bearing_debt")
+    _prev_cash = _num("prev_cash_and_equivalents")
+    _prev_ibd  = _num("prev_interest_bearing_debt")
+    net_cash_curr = _cash.fillna(0) - _ibd.fillna(0)
+    net_cash_prev = _prev_cash.fillna(0) - _prev_ibd.fillna(0)
+    # 仅当两期现金数据均可用时才计算
+    _both_cash_avail = _cash.notna() & _prev_cash.notna()
+    merged["net_cash_change_rate"] = (
+        ((net_cash_curr - net_cash_prev) / _eq_pos)
+        .where(_eq_pos > 0)
+        .where(_both_cash_avail)
+        .round(4)
+    )
+
     # B39-r2: 移除 operating_cashflow_yoy（已由 fcf_to_equity / fcf_momentum 覆盖）
     #         保留 operating_income_yoy —— 营业利润同比反映主业盈利趋势，与营收/回报角度互补
     _AUX_YOY = ["operating_cashflow_yoy"]
@@ -445,6 +466,7 @@ def rank_stocks(
         "ttm_return_yoy",
         "fcf_to_equity",
         "fcf_momentum",
+        "net_cash_change_rate",
     ]
     ZSCORE_COLS = [
         "growth_zscore_revenue",
@@ -452,6 +474,7 @@ def rank_stocks(
         "growth_zscore_ttm_return",
         "growth_zscore_fcf_equity",
         "growth_zscore_fcf_momentum",
+        "growth_zscore_net_cash_change",
     ]
     for col in GROWTH_COLS:
         if col not in merged.columns:
@@ -467,6 +490,7 @@ def rank_stocks(
         "growth_zscore_ttm_return": 3.0,
         "growth_zscore_fcf_equity": 1.0,
         "growth_zscore_fcf_momentum": 1.0,
+        "growth_zscore_net_cash_change": 0.5,
     }
     weights = pd.Series(GROWTH_WEIGHTS)[ZSCORE_COLS]
     weighted_sum = z_df.mul(weights, axis=1).sum(axis=1, skipna=True, min_count=1)
