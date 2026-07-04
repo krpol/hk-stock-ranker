@@ -28,7 +28,10 @@ def _periods_aug31():
 # ---- B11-1: 中期分配跨财年时应归到中报期，不归年报期 ----
 
 def test_interim_distribution_attributed_to_interim_period_across_fy():
-    """01890 case：FY2026 中期 ex_date=2026-03-06 → 必须归到 2026-02-28 中报期"""
+    """01890 case (B39-r8 修正)：
+    FY2025 中期 ex_date=2026-03-06 (延迟 1年+派息)，fiscal_year=2025
+      → 应归到 2025-02-28 (fy2025 的中报期)，不能归到 2026-02-28 (fy2026 中报期，未派)
+    优先信 fiscal_year 而不是 “距离 ex_date 最近”"""
     today = pd.Timestamp("2026-05-24")
     records = [
         DividendRecord(ex_date=pd.Timestamp("2026-03-06"), amount_hkd=0.07,
@@ -36,13 +39,21 @@ def test_interim_distribution_attributed_to_interim_period_across_fy():
     ]
     out = compute_dividend_fields(records, _periods_aug31(),
                                    fy_anchor=(8, 31), today=today)
-    assert out["latest_period_end"] == "2026-02-28"
-    assert out["latest_period_div_per_share"] == pytest.approx(0.07, abs=1e-6)
+    # B38 shift：past_periods[0]=2026-02-28 分红=0 & 历史同类中报有派→shift → latest=2025-08-31
+    assert out["latest_period_end"] == "2025-08-31"
+    # 2025-08-31 年报期本记录无派息（仅有 2025-02-28 中期 0.07）
+    assert out["latest_period_div_per_share"] == pytest.approx(0.0, abs=1e-6)
+    # 同期上年 = 2024-08-31 也无
+    assert out["latest_period_yoy_end"] == "2024-08-31"
+    assert out["latest_period_yoy_div_per_share"] == pytest.approx(0.0, abs=1e-6)
+    # fy_div 窗口 = [2025-08-31, 2025-02-28] 含 0.07
+    assert out["fy_div_per_share"] == pytest.approx(0.07, abs=1e-6)
 
 
 # ---- B11-2: 年度分配应归到年报期 ----
 
 def test_annual_distribution_attributed_to_annual_period():
+    """B39-r8: fiscal_year=2024 年度分配 → 归到 FY2024 年报期 2024-08-31（不是 FY2025）"""
     today = pd.Timestamp("2026-05-24")
     records = [
         DividendRecord(ex_date=pd.Timestamp("2025-08-01"), amount_hkd=0.06,
@@ -50,14 +61,25 @@ def test_annual_distribution_attributed_to_annual_period():
     ]
     out = compute_dividend_fields(records, _periods_aug31(),
                                    fy_anchor=(8, 31), today=today)
-    # FY2025 = (2024-08-31, 2025-08-31] 含 2025-08-31 年报
-    assert out["fy_div_per_share"] == pytest.approx(0.06, abs=1e-6)
+    # fy=2024 年度 → 2024-08-31
+    # TTM 窗口 [2026-02-28, 2025-08-31] 不含 2024-08-31 → fy_div=0
+    assert out["fy_div_per_share"] == pytest.approx(0.0, abs=1e-6)
+    # prev_year TTM 窗口 [2025-02-28, 2024-08-31] → 含 0.06
+    assert out["prev_year_div_per_share"] == pytest.approx(0.06, abs=1e-6)
 
 
 # ---- B11-3: 完整 01890 数据复现 ----
 
 def test_b11_01890_full_scenario():
-    """01890 中国科培完整 4 笔派息归属，所有字段全检查"""
+    """01890 完整 4 笔派息归属（B39-r8 修正：具体时间线）：
+      2024-12-06 fy=2024 中期 0.07 → 2024-02-29 (FY2024 中报期, 8月财年中期=上年 2 月)
+      2025-08-01 fy=2024 年度 0.06 → 2024-08-31 (FY2024 年报期)
+      2026-03-06 fy=2025 中期 0.07 → 2025-02-28 (FY2025 中报期)
+      2026-07-31 fy=2025 年度 0.06 → 2025-08-31 pending (FY2025 年报期)
+
+    today=2026-05-24, past_periods[0]=2026-02-28 分红=0 → B38 shift 触发
+      → latest_period = 2025-08-31（已 shift）
+    """
     today = pd.Timestamp("2026-05-24")
     records = [
         DividendRecord(ex_date=pd.Timestamp("2024-12-06"), amount_hkd=0.07,
@@ -72,13 +94,14 @@ def test_b11_01890_full_scenario():
     out = compute_dividend_fields(records, _periods_aug31(),
                                    fy_anchor=(8, 31), today=today)
 
-    # FY2025 = (2024-08-31, 2025-08-31] 含中报 2025-02-28 + 年报 2025-08-31
-    #   = 中期 0.07(2024-12-06) + 年度 0.06(2025-08-01) = 0.13
+    # B38 shift 后 latest = 2025-08-31
+    assert out["latest_period_end"] == "2025-08-31"
+    # 2025-08-31 pending 0.06 (fy=2025 年度)
+    assert out["latest_period_div_per_share"] == pytest.approx(0.06, abs=1e-6)
+    # 同期上年 2024-08-31 done 0.06 (fy=2024 年度)
+    assert out["latest_period_yoy_div_per_share"] == pytest.approx(0.06, abs=1e-6)
+    # TTM = [2025-08-31, 2025-02-28] = 0.06 + 0.07 = 0.13
     assert out["fy_div_per_share"] == pytest.approx(0.13, abs=1e-6)
-    # 最近期 2026-02-28 = 0.07
-    assert out["latest_period_div_per_share"] == pytest.approx(0.07, abs=1e-6)
-    # 同期上年 2025-02-28 = 0.07
-    assert out["latest_period_yoy_div_per_share"] == pytest.approx(0.07, abs=1e-6)
     # forward = 2026-07-31 pending 0.06
     assert out["forward_div_per_share"] == pytest.approx(0.06, abs=1e-6)
 
@@ -122,6 +145,7 @@ def test_unknown_distribution_type_falls_through_to_r3():
 # ---- B11-6: "末期" 派息（特别派息别名）归到年报期 ----
 
 def test_terminal_distribution_attributed_to_annual_period():
+    """B39-r8: fiscal_year=2024 末期分配 → 2024-08-31（不在 FY2025 TTM 窗口）"""
     today = pd.Timestamp("2026-05-24")
     records = [
         DividendRecord(ex_date=pd.Timestamp("2025-08-01"), amount_hkd=0.06,
@@ -129,5 +153,7 @@ def test_terminal_distribution_attributed_to_annual_period():
     ]
     out = compute_dividend_fields(records, _periods_aug31(),
                                    fy_anchor=(8, 31), today=today)
-    # "末期" 也按年报期归属
-    assert out["fy_div_per_share"] == pytest.approx(0.06, abs=1e-6)
+    # 归到 2024-08-31，不在 TTM [2026-02-28, 2025-08-31] 内 → fy_div=0
+    assert out["fy_div_per_share"] == pytest.approx(0.0, abs=1e-6)
+    # 在 prev_year TTM [2025-02-28, 2024-08-31] 内
+    assert out["prev_year_div_per_share"] == pytest.approx(0.06, abs=1e-6)

@@ -512,16 +512,18 @@ def test_D12_interim_md_match_for_aug_fy_anchor_in_non_leap_year():
     out = compute_dividend_fields(records, periods, fy_anchor=(8, 31), today=today,
                                    forward_override=None)
 
-    # 关键断言：latest_period 应是 2026-02-28（最近 ≤ today 的财报期，含中报）
-    assert out["latest_period_end"] == "2026-02-28"
-    # B11 修复：2026-03-06 中期 0.07 → 归到 2026-02-28 中报期
-    assert out["latest_period_div_per_share"] == pytest.approx(0.07, abs=1e-6)
-    # 同期上年（2025-02-28）：2024-12-06 中期 0.07 归到此处
-    assert out["latest_period_yoy_div_per_share"] == pytest.approx(0.07, abs=1e-6)
-    # current_fy_end = 2025-08-31（最新 ≤ today 的年报锚点）
+    # B39-r8 修正：信 fiscal_year → 2024-12-06 fy=2024 中期 → 2024-02-29 （6,7 月的 fy=2024 中报期）
+    # 2026-03-06 fy=2025 中期 → 2025-02-28
+    # today=2026-05-24: past_periods=[2026-02-28, 2025-08-31,...]，首期 2026-02-28 分红=0
+    #   → B38 shift → latest = 2025-08-31
+    assert out["latest_period_end"] == "2025-08-31"
+    # 2025-08-31 年报期无派息（fy=2025 年度 2026-07-31 仍 pending，归到 2025-08-31）
+    assert out["latest_period_div_per_share"] == pytest.approx(0.06, abs=1e-6)  # pending 0.06
+    # 同期上年 2024-08-31 ← fy=2024 年度 0.06
+    assert out["latest_period_yoy_div_per_share"] == pytest.approx(0.06, abs=1e-6)
+    # current_fy_end = 2025-08-31
     assert out["current_fy_end"] == "2025-08-31"
-    # FY2025 = (2024-08-31, 2025-08-31]，含中报 2025-02-28 + 年报 2025-08-31
-    #   = 中期 0.07 (2024-12-06) + 年度 0.06 (2025-08-01) = 0.13
+    # FY2025 TTM = [2025-08-31, 2025-02-28] = 0.06(pending) + 0.07(2026-03-06) = 0.13
     assert out["fy_div_per_share"] == pytest.approx(0.13, abs=1e-6)
     # forward_div = FY2025 pending(=0) + future periods pending(=0.06 @2026-08-31) = 0.06
     assert out["forward_div_per_share"] == pytest.approx(0.06, abs=1e-6)
