@@ -515,8 +515,11 @@ def _apply_filters(df: pd.DataFrame, filter_div_growth: bool, filter_return_grow
         cp = pd.to_numeric(out.get("current_price"), errors="coerce")
         div_yield_ok = None
         if an is not None and bn is not None and cp is not None:
-            div_yield_ok = ((2 * an - bn) / cp.where(cp > 0)) >= 0.15
-            div_yield_ok = div_yield_ok.fillna(False)
+            if hasattr(cp, 'where'):
+                div_yield_ok = ((2 * an - bn) / cp.where(cp > 0)) >= 0.15
+                div_yield_ok = div_yield_ok.fillna(False)
+            else:
+                div_yield_ok = (cp > 0) and (((2 * an - bn) / cp) >= 0.15)
         if ttm_ok is not None and latest_ok is not None:
             keep = ttm_ok | latest_ok
             if div_yield_ok is not None:
@@ -539,8 +542,10 @@ def _apply_filters(df: pd.DataFrame, filter_div_growth: bool, filter_return_grow
             keep = en >= fn
             # 保留高回报率救生（与 forward_div 无关）：return_rate >= 15%
             rr = pd.to_numeric(out.get("return_rate"), errors="coerce")
-            if rr is not None:
+            if rr is not None and hasattr(rr, 'fillna'):
                 keep = keep | (rr >= 15).fillna(False)
+            elif rr is not None:
+                keep = keep | bool(rr >= 15)
             out = out[keep]
     if filter_real_buyback:
         # 只保留股本净变化 >= 0（未被稀释）的股票
