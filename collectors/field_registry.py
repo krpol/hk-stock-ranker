@@ -127,6 +127,20 @@ FIELD_REGISTRY: dict[str, FieldMeta] = {
     "interest_bearing_debt": FieldMeta(
         "有息负债", "akshare+yfinance", "point_in_time",
         min_coverage=0.90, sane_range=(0, None), allow_negative=False),
+    # B40: 上年值（用于 net_cash_change_rate）
+    "prev_cash_and_equivalents": FieldMeta(
+        "上年现金及等价物", "akshare+yfinance", "point_in_time",
+        min_coverage=0.90, sane_range=(0, None), allow_negative=False),
+    "prev_interest_bearing_debt": FieldMeta(
+        "上年有息负债", "akshare+yfinance", "point_in_time",
+        min_coverage=0.85, sane_range=(0, None), allow_negative=False),
+    # B41: 流动金融资产（定期+短投+FVTPL 流动）—— 广义现金增量
+    "liquid_financial_assets": FieldMeta(
+        "流动金融资产", "akshare+yfinance", "point_in_time",
+        min_coverage=0.70, sane_range=(0, None), allow_negative=False),
+    "prev_liquid_financial_assets": FieldMeta(
+        "上年流动金融资产", "akshare+yfinance", "point_in_time",
+        min_coverage=0.60, sane_range=(0, None), allow_negative=False),
 
     # ── FCF 组件（B34: AKShare 优先 + yfinance 兜底）──────────────────────
     "ocf_3y_avg": FieldMeta(

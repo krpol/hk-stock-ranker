@@ -1,4 +1,25 @@
 {
+  "00001": {
+    "buyback": "fail",
+    "debt": "fail",
+    "dilution": "fail",
+    "dividend": "fail",
+    "growth": "fail"
+  },
+  "00002": {
+    "buyback": "fail",
+    "debt": "fail",
+    "dilution": "fail",
+    "dividend": "fail",
+    "growth": "fail"
+  },
+  "00003": {
+    "buyback": "fail",
+    "debt": "fail",
+    "dilution": "fail",
+    "dividend": "fail",
+    "growth": "fail"
+  },
   "09869": {
     "buyback": "get_fiscal_year_dates returned None (likely yfinance unavailable)",
     "dividend": "no fiscal periods found (likely yfinance unavailable)"

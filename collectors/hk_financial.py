@@ -37,6 +37,7 @@ DOMAIN_FIELDS: dict = {
     ],
     "debt": ["net_debt_ratio", "total_liability_ratio", "debt_to_equity", "roe", "cash_and_equivalents", "interest_bearing_debt",
              "prev_cash_and_equivalents", "prev_interest_bearing_debt",
+             "liquid_financial_assets", "prev_liquid_financial_assets",
              "ocf_3y_avg", "capex_3y_avg", "dep_amortization_3y_avg", "current_lease_obligation_prev", "equity_latest",
              "capex_ttm", "da_ttm", "current_lease_obligation_ttm", "prev_capex", "prev_da",
              "fcf_as_of", "debt_as_of"],
@@ -974,6 +975,24 @@ def get_debt_ratios(code: str) -> Optional[dict]:
         cash_and_equivalents = _latest(AK_ITEM_MAP["cash_and_equivalents"], [
             "Cash And Cash Equivalents", "CashAndCashEquivalents", "Cash",
         ]) or 0.0
+        # B41: 流动金融资产（定期+短投+FVTPL 流动）—— 广义现金增量
+        liquid_financial_assets = _latest(
+            AK_ITEM_MAP["liquid_financial_assets"],
+            [
+                "Other Short Term Investments", "OtherShortTermInvestments",
+                "Short Term Investments", "ShortTermInvestments",
+            ],
+            sum_items=True,
+        ) or 0.0
+        _prev_lfa_raw = _prev(
+            AK_ITEM_MAP["liquid_financial_assets"],
+            [
+                "Other Short Term Investments", "OtherShortTermInvestments",
+                "Short Term Investments", "ShortTermInvestments",
+            ],
+            sum_items=True,
+        )
+        prev_liquid_financial_assets = float(_prev_lfa_raw) if _prev_lfa_raw is not None else None
         # B40: 上年现金及有息负债（用于净现金变化率）
         _prev_cash_raw = _prev(AK_ITEM_MAP["cash_and_equivalents"], [
             "Cash And Cash Equivalents", "CashAndCashEquivalents", "Cash",
@@ -1023,8 +1042,10 @@ def get_debt_ratios(code: str) -> Optional[dict]:
             "debt_to_equity": debt_to_equity,
             "roe": roe,
             "cash_and_equivalents": float(cash_and_equivalents) if cash_and_equivalents else None,
+            "liquid_financial_assets": float(liquid_financial_assets) if liquid_financial_assets else None,
             "interest_bearing_debt": float(net_debt) if net_debt else None,
             "prev_cash_and_equivalents": prev_cash_and_equivalents,
+            "prev_liquid_financial_assets": prev_liquid_financial_assets,
             "prev_interest_bearing_debt": prev_interest_bearing_debt,
             "debt_as_of": _debt_as_of,
         }
@@ -1058,6 +1079,14 @@ AK_ITEM_MAP: dict = {
     "total_liabilities": ["总负债"],
     "stockholders_equity": ["股东权益", "总权益"],
     "cash_and_equivalents": ["现金及等价物"],
+    # B41: 广义现金新增流动金融资产（定期存款 + 短期投资 + FVTPL 流动 + 交易性金融资产流动）
+    # 用于 net_cash_change_rate 的广义现金口径，不影响 Net D/E（后者仍用狭义 cash）
+    "liquid_financial_assets": [
+        "短期存款",
+        "短期投资",
+        "指定以公允价值记账之金融资产(流动)",
+        "交易性金融资产(流动)",
+    ],
     "current_lease_obligation": ["融资租赁负债(流动)"],
     "short_term_debt": ["短期贷款", "短期借款", "一年内到期的非流动负债"],
     "long_term_debt": ["长期贷款", "长期借款"],

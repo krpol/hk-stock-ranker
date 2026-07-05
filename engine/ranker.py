@@ -434,15 +434,18 @@ def rank_stocks(
     merged["fcf_to_equity"] = (real_fcf_ttm / _eq_pos).round(4)
     merged["fcf_momentum"] = ((real_fcf_ttm - prev_real_fcf_ttm) / _eq_pos).round(4)
 
-    # --- B40: 净现金变化率 = (净现金当期 - 净现金上年) / equity ---
-    # 净现金 = cash_and_equivalents - interest_bearing_debt
+    # --- B40: 净现金变化率 = (广义净现金当期 - 广义净现金上年) / equity ---
+    # B41: 广义净现金 = cash_and_equivalents + liquid_financial_assets - interest_bearing_debt
+    #      流动金融资产（定期存款 + 短期投资 + FVTPL 流动）计入，避免遗漏理财/结构性存款
     _cash = _num("cash_and_equivalents")
+    _lfa  = _num("liquid_financial_assets")
     _ibd  = _num("interest_bearing_debt")
     _prev_cash = _num("prev_cash_and_equivalents")
+    _prev_lfa  = _num("prev_liquid_financial_assets")
     _prev_ibd  = _num("prev_interest_bearing_debt")
-    net_cash_curr = _cash.fillna(0) - _ibd.fillna(0)
-    net_cash_prev = _prev_cash.fillna(0) - _prev_ibd.fillna(0)
-    # 仅当两期现金数据均可用时才计算
+    net_cash_curr = _cash.fillna(0) + _lfa.fillna(0) - _ibd.fillna(0)
+    net_cash_prev = _prev_cash.fillna(0) + _prev_lfa.fillna(0) - _prev_ibd.fillna(0)
+    # 仅当两期狭义现金数据均可用时才计算（lfa 可以为 NaN，视为 0）
     _both_cash_avail = _cash.notna() & _prev_cash.notna()
     merged["net_cash_change_rate"] = (
         ((net_cash_curr - net_cash_prev) / _eq_pos)
