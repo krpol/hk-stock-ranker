@@ -271,10 +271,11 @@ def _attach_cashflow_factors(df: pd.DataFrame) -> pd.DataFrame:
     out["real_fcf_ttm"] = real_fcf_ttm_vals
     out["drop_ratio"] = drop_ratio_vals
 
-    # B27 → B32-UI → B39: sustainable_return_rate = capped_payout / current_price - dilution
-    # 封顶：fy_div + real_buyback 合计不得超过 (3y real_fcf + 净现金 × 10%) / 股本
-    #   含义：3 年真 FCF 是可持续来源；净现金按 10% 折现/年化补贴 = 用现金垫付 10 年的容忍度
+    # B27 → B32-UI → B39 → B41-r3: sustainable_return_rate = capped_payout / current_price - dilution
+    # 封顶：fy_div + real_buyback 合计不得超过 (3y real_fcf + 净现金 × 5%) / 股本
+    #   含义：3 年真 FCF 是可持续来源；净现金按 5% 折现/年化补贴 = 用现金垫付 20 年的容忍度
     #   B39: 分红 + 回购 一起被 cap 盖住 —— 回购同样吃现金，不能借回购绕过 FCF 上限
+    #   B41-r3: 净现金补贴系数 10% -> 5%（更保守，避免高净现金公司的分红被高估）
     # 负值 → 0（直接砍光派息）；金融行业 / 3y OCF 缺失 → 回退到 return_rate
     ind = out.get("industry").astype(str) if "industry" in out.columns else pd.Series("", index=out.index)
     fin_exempt = ind.isin(_FIN_INDUSTRY_EXEMPT)
@@ -282,7 +283,7 @@ def _attach_cashflow_factors(df: pd.DataFrame) -> pd.DataFrame:
     net_cash_abs = cash_s.fillna(0) - ibd_s.fillna(0)                    # 绝对值
     # 净现金 > 0 才生效（负净现金不再扣 cap，避免 real_fcf 与净负债双重惩罚）
     net_cash_pos = net_cash_abs.clip(lower=0)
-    cap_total = rfcf_abs + net_cash_pos * 0.1                            # 可分配总额（绝对）
+    cap_total = rfcf_abs + net_cash_pos * 0.05                           # 可分配总额（绝对）
     cap_per_share = cap_total / shs.where(shs > 0)
     cap = cap_per_share.clip(lower=0)                                    # 负 → 0
     fy_div_ps = pd.to_numeric(out.get("fy_div_per_share"), errors="coerce").fillna(0)
