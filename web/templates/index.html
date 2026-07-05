@@ -84,7 +84,7 @@
             <input type="checkbox" name="focf" value="1" onchange="this.form.submit()" {% if filter_ocf %}checked{% endif %}>
             现金流降幅≤50%
         </label>
-        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="剔除 成长因子(growth_factor) < -0.35（加权 zscore 复合得分：revenue/operating_income/operating_cashflow 权重 1，ttm_return 权重 2；NaN 保留）&#10;现金堡垒公司放宽到 < -1.0&#10;B38 严档：FCF 评级 OK/WARN/DROP/N/A 收紧到 < -0.20">
+        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="剔除 成长因子(growth_factor) < -0.35（6 子因子加权 zscore：revenue/opinc/fcf_momentum/net_cash_change 各×1、ttm_return ×3、fcf_equity ×0.5；NaN 保留）&#10;现金堡垒公司放宽到 < -1.0&#10;B38 严档：FCF 评级 OK/WARN/DROP/N/A 收紧到 < -0.20">
             <input type="checkbox" name="fgf" value="1" onchange="this.form.submit()" {% if filter_growth_factor %}checked{% endif %}>
             成长因子 ≥ -0.35
         </label>
@@ -108,7 +108,7 @@
             <input type="checkbox" name="fcc" value="1" onchange="this.form.submit()" {% if filter_cash_conversion %}checked{% endif %}>
             现金转化率≥0.5
         </label>
-        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="砍条件（三者同时满足才砍）：&#10;  ① real_fcf / 市值 ≤ 8%（FCF 收益率不到 8%）&#10;  ② 3y avg real_fcf / 3y avg 现金分红 < 1.0（长周期不足）&#10;  ③ 当年 real_fcf_ttm / 当年现金分红 < 1.0（TTM 不足）&#10;豁免：非派息股 / 金融行业 / 现金堡垒(cash−ibd>市值) 且 3y avg real_fcf + 0.1×(cash−ibd) > 3y avg 分红总额 且 real_fcf > 0">
+        <label style="font-size:0.88rem;display:flex;align-items:center;gap:5px;cursor:pointer;" title="砍条件（三者同时满足才砍）：&#10;  ① real_fcf / 市值 ≤ 8%（FCF 收益率不到 8%）&#10;  ② 3y avg real_fcf / 3y avg 现金分红 < 1.0（长周期不足）&#10;  ③ 当年 real_fcf_ttm / 当年现金分红 < 1.0（TTM 不足）&#10;豁免：非派息股 / 金融行业 / 现金堡垒(cash−ibd>市值) 且 3y avg real_fcf + 0.05×净现金 > 3y avg 分红总额 且 real_fcf > 0（B41-r3：豁免口径与 sustainable cap 同步，净现金系数 0.1→0.05）">
             <input type="checkbox" name="fdcc" value="1" onchange="this.form.submit()" {% if filter_dividend_coverage %}checked{% endif %}>
             分红现金覆盖≥1
         </label>
@@ -245,12 +245,12 @@
                                 '真实回购(股本净变化≥0)': '保留 net_share_change_rate ≥ 0（排除被 SBC 增发抵消的伪回购）',
                                 '营收降幅': '保留 revenue_yoy ≥ -10%\\n现金堡垒放宽到 -30%；B38 严档（评级OK及以下）收紧到 -8%',
                                 'OCF 降幅': '保留 operating_cashflow_yoy ≥ -50%（空值剔除）\\n现金堡垒放宽到 -80%；B38 严档收紧到 -30%',
-                                '成长因子': '保留 growth_factor ≥ -0.35\\n现金堡垒放宽到 -1.0；B38 严档收紧到 -0.20',
+                                '成长因子': '保留 growth_factor ≥ -0.35\\n现金堡垒放宽到 -1.0；B38 严档收紧到 -0.20\\n6 子因子 z 加权：revenue/opinc/fcf_momentum/net_cash_change ×1、ttm_return ×3、fcf_equity ×0.5（B41-r2）',
                                 'ROE z': '保留 ROE 横截面 z ≥ -1.8（NaN 保留）\\nB38 严档收紧到 z ≥ -1.5',
                                 '有息负债/净资产≤70%': '保留 debt_to_equity ≤ 70%（硬阈值，空值保留）\\n现金堡垒豁免',
                                 '有息负债/净资产 z≤1.2': '剔除 debt_to_equity 横截面 z > 1.2（杠杆显著高于均值 1.2σ；空值保留）',
                                 '现金转化率≥0.5': '保留 3年平均 OCF / 3年平均营业利润 ≥ 0.5\\n银行/保险/其他金融/投资公司豁免；现金堡垒需同时 OCF_3y_avg > 0',
-                                '分红现金覆盖≥1': '三条件同时满足才砍：FCF/市值≤8% 且 3yDCC<1 且 TTM覆盖<1\\n豁免：非派息/金融/现金堡垒且可分配覆盖',
+                                '分红现金覆盖≥1': '三条件同时满足才砍：FCF/市值≤8% 且 3yDCC<1 且 TTM覆盖<1\\n豁免：非派息/金融/现金堡垒且可分配覆盖（B41-r3：净现金豁免系数 10%→5%）',
                                 'FCF 评级': 'AAA=现金堡垒 | STRONG≥30% | OK 20-30% | WARN 15-20% | DROP <15%或real_fcf<0 | N/A 缺失\\nB38：评级 OK/WARN/DROP/N/A 触发严档（多过滤器阈值收紧）',
                                 '≤3年低×3': '保留 当前股价 ≤ 3年(36月)最低收盘价 × 3（避免追高；空价剔除）',
                                 '≤6月低×1.6': '保留 当前股价 ≤ 6月最低收盘价 × 1.6',
@@ -295,13 +295,13 @@
     "公司名称": "中文名",
     "所属行业": "行业分类（来自东方财富）",
     "当前收盘价(HKD)": "排名时刻的当前价格",
-    "综合得分": "composite_score = sustainable_return_z×1.0 + growth_factor×0.2 + cash_fortress_factor×0.2（B36）\n三项：可持续回报 Z（含 real_fcf cap）、增长因子（6子因子加权平均，TTM回报同比×3、OCF同比×0.5）、现金堡垒因子（cash_buffer_z_v2 与 fcf_yield_z 各占0.5）。",
-    "回报 Z": "sustainable_return_zscore = winsorized_zscore(sustainable_return_rate)（B32-UI v6：改用 sustainable，含 real_fcf cap）",
-    "增长因子": "growth_factor = 加权平均(z_revenue×1 + z_opinc×1 + z_ocf×1 + z_ttm_return×2 + z_fcf_equity×1 + z_fcf_momentum×1) / 总权重；NaN-safe",
-    "回报率(%)": "return_rate = (fy_div + real_buyback) / current_price × 100 − dilution × 100",
-    "可持续回报率(%)": "sustainable_return_rate = (min(fy_div, cap) + real_buyback) / price × 100 − dilution × 100\ncap = (real_fcf_3y + max(net_cash, 0) × 10%) / shares；金融/3yOCF 缺失豁免回退到 return_rate",
-    "真实TTM回报(HKD)": "real_ttm_return_rate = TTM 分红 + real_buyback（含 dilution 折算）",
-    "TTM回报(HKD)": "ttm_return_rate = TTM 分红 + buyback_per_share",
+    "综合得分": "composite_score = sustainable_return_z×1.0 + growth_factor×0.2 + cash_fortress_factor×0.2（B36）\n三项：可持续回报 Z（含 real_fcf cap，B41-r3：净现金补贴 5%）、增长因子（6 子项加权平均，B41-r2 权重）、现金堡垒因子（cash_buffer_z_v2 与 fcf_yield_z 各占 0.5）。",
+    "回报 Z": "sustainable_return_zscore = winsorized_zscore(sustainable_return_rate)（B32-UI v6：改用 sustainable，含 real_fcf cap；B41-r3：净现金补贴 5%）",
+    "增长因子": "growth_factor = 加权平均(z_revenue×1 + z_opinc×1 + z_ttm_return×3 + z_fcf_equity×0.5 + z_fcf_momentum×1 + z_net_cash_change×1) / 7.5；NaN-safe（B41-r2）",
+    "回报率(%)": "return_rate = (fy_div + real_buyback) / current_price × 100 − dilution × 100（含真实回购和稀释）",
+    "可持续回报率(%)": "sustainable_return_rate = min(fy_div + real_buyback, 每股 cap) / price × 100 − dilution × 100\ncap = (3y_real_fcf + max(net_cash, 0) × 5%) / shares（B41-r3：净现金补贴系数 10%→5%，垫付 20 年）\n金融行业/real_fcf 缺失时豁免回退到 return_rate",
+    "真实TTM回报(HKD)": "real_ttm_return_rate = fy_div_per_share + real_buyback_per_share（TTM 每股真实回报：分红 + 真实回购）",
+    "TTM回报(HKD)": "ttm_return_rate = fy_div_per_share + buyback_per_share（TTM 每股回报：分红 + 名义回购，未扣发行）",
     "上年TTM回报(HKD)": "prev_ttm_return_rate = 上年同期 TTM 回报",
     "最近期分红(HKD)": "latest_period_div_per_share = 最近一期已派/已宣派的分红/股",
     "同期上年分红(HKD)": "latest_period_yoy_div_per_share = 同期上年分红/股（YoY 对比）",
@@ -317,17 +317,19 @@
     "TTM回报金额同比": "ttm_return_yoy = (TTM 回报 − 上年 TTM 回报) / |上年|",
     "营收增长 Z": "growth_zscore_revenue = winsorized_zscore(revenue_yoy)",
     "营业利润增长 Z": "growth_zscore_operating_income = winsorized_zscore(operating_income_yoy)",
-    "经营现金流增长 Z": "growth_zscore_operating_cashflow = winsorized_zscore(operating_cashflow_yoy)；增长因子子项，权重0.5（B36：从1.0下调至0.5，与 TTM 回报同比重叠去权）",
-    "TTM回报增长 Z": "growth_zscore_ttm_return = winsorized_zscore(ttm_return_yoy)；增长因子子项，权重3.0（B36：从2.0上调至3.0，主导增长因子）",
-    "FCF/净资产 Z": "growth_zscore_fcf_equity = winsorized_zscore(fcf_to_equity)；FCF/净资产的横截面 z得分，增长因子子项之一（权重1）",
-    "现金流动量 Z": "growth_zscore_fcf_momentum = winsorized_zscore(fcf_momentum)；现金流同比改善度的 z得分，增长因子子项之一（权重1）",
+    "经营现金流增长 Z": "growth_zscore_operating_cashflow = winsorized_zscore(operating_cashflow_yoy)；B39 已移出增长因子（被 fcf_momentum 替代）",
+    "TTM回报增长 Z": "growth_zscore_ttm_return = winsorized_zscore(ttm_return_yoy)；增长因子子项，权重 3.0（主导：股东回报最直接信号）",
+    "FCF/净资产 Z": "growth_zscore_fcf_equity = winsorized_zscore(fcf_to_equity)；增长因子子项，权重 0.5（B41-r2：从 1.0 降到 0.5，TTM 单期口径波动大）",
+    "现金流动量 Z": "growth_zscore_fcf_momentum = winsorized_zscore(fcf_momentum)；TTM real_fcf 同比改善度 z 得分，增长因子子项，权重 1.0",
+    "净现金变化率 Z": "growth_zscore_net_cash_change = winsorized_zscore(net_cash_change_rate)；增长因子子项，权重 1.0（B41-r2：从 0.5 升到 1.0；B41 广义现金能识别理财抛售等真实信号）",
     "现金缓冲比": "cash_buffer_ratio_v2 = (cash − ibd) / market_cap（B32-UI v6：去掉 3×div 扣减，与 cash_fortress 同口径）",
     "现金缓冲 Z": "cash_buffer_zscore_v2 = winsorized_zscore(cash_buffer_ratio_v2)",
     "现金缓冲比v2": "cash_buffer_ratio_v2 = (cash − ibd) / market_cap（净现金占市值比；与 cash_fortress 同口径，不扣 3×div）",
     "FCF收益率": "fcf_yield = real_fcf / market_cap（剩余自由现金流相对市值的收益率；现金堡垒 AAA 在 z 上直接取最大值）",
     "现金堡垒因子": "cash_fortress_factor = 0.5 × cash_buffer_z_v2 + 0.5 × fcf_yield_z（B36：合并两个 mcap 分母信号——净现金/市值 与 real_fcf/市值——为综合得分的现金堡垒项，权重 0.2）",
-    "FCF/净资产": "fcf_to_equity = real_fcf_ttm / equity_latest；TTM口径 real_fcf = ocf_ttm − min(capex_ttm + lease_ttm, da_ttm)，除以最新净资产（资产中现金创造水平）",
-    "现金流动量": "fcf_momentum = (real_fcf_ttm − prev_real_fcf_ttm) / equity_latest；TTM real_fcf 同比变化占净资产比重，代表资产中现金的改善度",
+    "FCF/净资产": "fcf_to_equity = real_fcf_ttm / equity_latest；TTM 口径 real_fcf = ocf_ttm − min(capex_ttm + lease_ttm, da_ttm)，除以最新净资产（资产的现金创造水平）",
+    "现金流动量": "fcf_momentum = (real_fcf_ttm − prev_real_fcf_ttm) / equity_latest；TTM real_fcf 同比变化占净资产比重（现金改善度）",
+    "净现金变化率": "net_cash_change_rate = (广义净现金_curr − 广义净现金_prev) / equity_latest\nB41：广义净现金 = cash + liquid_financial_assets − ibd\nliquid_financial_assets = 定期存款 + 短期投资 + 指定 FVTPL(流动) + 交易性金融资产(流动)（B41 新增，覆盖理财型金融资产）",
     "3年OCF为正": "_ocf_3y_pos = (3年平均经营现金流 ocf_3y_avg > 0)；用于现金堡垒豁免 fcc 过滤的辅助布尔列",
     "前年每股分红(HKD)": "two_years_ago_div_per_share = 两年前 TTM 每股现金分红；用于计算 3年平均每股分红（fdcc 过滤）",
     "有息负债率": "net_debt_ratio = interest_bearing_debt / total_assets",
@@ -344,13 +346,14 @@
     "回购总额(HKD)": "buyback_amount = 当期回购总金额",
     "TTM分红(HKD)": "fy_div_per_share = 最新 TTM 每股现金分红",
     "上年TTM分红(HKD)": "prev_year_div_per_share = 上年 TTM 每股现金分红",
-    "cash_and_equivalents": "现金及等价物（最新报告期）",
+    "cash_and_equivalents": "现金及等价物（狭义现金，最新报告期；用于 Net D/E 保守口径）",
     "interest_bearing_debt": "有息负债 = 短期借款 + 长期借款（最新报告期）",
+    "liquid_financial_assets": "流动金融资产（B41 广义现金增量）= 定期存款 + 短期投资 + 指定 FVTPL(流动) + 交易性金融资产(流动)；仅用于 net_cash_change_rate 广义现金口径，不进入 Net D/E",
     "现金转化率": "cash_conversion = avg_3y(OCF) / avg_3y(OpInc)（OpInc<=0 → NaN）",
     "剩余CF/净债": "coverage_ratio = real_fcf_3y / max(IBD − Cash, max(Equity×1%, 1亿))",
     "FCF评级": "AAA=现金堡垒(cash−ibd>市值) | STRONG≥100% | OK 20-100% | WARN 15-20% | DROP <15% 或 real_fcf<0 | N/A 缺失\n降级：drop_ratio<30% 降一档；drop_ratio<0 降两档",
     "近1年突降": "drop_ratio = real_fcf_ttm / real_fcf_3y；<30% 警告，<0 严重",
-    "分红现金覆盖": "dividend_coverage = real_fcf_3y / (avg_3y(fy_div) × shares)",
+    "分红现金覆盖": "dividend_coverage = real_fcf_3y / (avg_3y(fy_div) × shares)（3 年平均口径的分红覆盖倍数）",
     "剩余CF(亿)": "real_fcf_yi = real_fcf_3y / 1亿\nreal_fcf = OCF_3y − min(CapEx_TTM + 期初租赁, D&A_3y)",
 } %}
 <div class="table-wrap">

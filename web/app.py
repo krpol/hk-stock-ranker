@@ -652,7 +652,8 @@ def _apply_filters(df: pd.DataFrame, filter_div_growth: bool, filter_return_grow
         #   ① real_fcf / market_cap ≤ 8%（FCF 收益率不高）
         #   ② 3y avg real_fcf / 3y avg 现金分红 < 1.0（长周期口径不足）
         #   ③ real_fcf_ttm / 当年现金分红 < 1.0（当年 TTM 口径不足）
-        # 豁免：非派息股 / 金融行业 / 可分配覆盖（3y avg real_fcf + 0.1×净现金 > 3y avg 分红总额）
+        # 豁免：非派息股 / 金融行业 / 可分配覆盖（3y avg real_fcf + 0.05×净现金 > 3y avg 分红总额）
+        # B41-r3: 净现金系数 0.1 → 0.05，与 sustainable_return cap 同步
         ind = out.get("industry").astype(str) if "industry" in out.columns else None
         exempt = ind.isin(_FIN_INDUSTRY_EXEMPT) if ind is not None else pd.Series(False, index=out.index)
         rfcf = pd.to_numeric(out.get("real_fcf"), errors="coerce")
@@ -670,12 +671,12 @@ def _apply_filters(df: pd.DataFrame, filter_div_growth: bool, filter_return_grow
         # ③ TTM coverage < 1
         ttm_cover = rfcf_ttm / annual_div_total.where(annual_div_total > 0)
         cond_ttm_under = ttm_cover.notna() & (ttm_cover < 1.0)
-        # 豁免：现金堡垒 且 可分配总额（3y real_fcf + 0.1×净现金）盖得住 3y 平均分红 且 real_fcf > 0
+        # 豁免：现金堡垒 且 可分配总额（3y real_fcf + 0.05×净现金）盖得住 3y 平均分红 且 real_fcf > 0
         cash_fortress = cash_fortress_col.reindex(out.index).fillna(False)
         ibd = pd.to_numeric(out.get("interest_bearing_debt"), errors="coerce")
         cash = pd.to_numeric(out.get("cash_and_equivalents"), errors="coerce")
         net_cash_abs = cash.fillna(0) - ibd.fillna(0)
-        dist_total = rfcf.fillna(0) + 0.1 * net_cash_abs
+        dist_total = rfcf.fillna(0) + 0.05 * net_cash_abs
         prev_div_ps = pd.to_numeric(out["prev_year_div_per_share"], errors="coerce") if "prev_year_div_per_share" in out.columns else pd.Series(0.0, index=out.index)
         two_ago_div_ps = pd.to_numeric(out["_two_years_ago_div_per_share"], errors="coerce") if "_two_years_ago_div_per_share" in out.columns else pd.Series(0.0, index=out.index)
         div_3y_avg_ps = (fyd_ps.fillna(0) + prev_div_ps.fillna(0) + two_ago_div_ps.fillna(0)) / 3.0
