@@ -394,6 +394,8 @@ import pickle as _pickle
 from datetime import datetime as _datetime, timedelta as _timedelta
 
 _HK_DAILY_CACHE_DIR = _os.path.join("data", "cache", "hk_daily")
+_HK_DAILY_FAILED_PATH = _os.path.join("data", "cache", "hk_daily_failed.json")
+_FAILED_MAX_ATTEMPTS = 5  # attempts 达到此值后跳过（视为死码：退市/长期停牌）
 
 
 def _daily_cache_path(code: str) -> str:
@@ -401,14 +403,66 @@ def _daily_cache_path(code: str) -> str:
     return _os.path.join(_HK_DAILY_CACHE_DIR, f"{code}.pkl")
 
 
-def _load_daily_cache(code: str, max_age_days: int = 30) -> Optional[pd.DataFrame]:
+# ---------- Failed sidecar (持久化重试状态) ----------
+_failed_daily_cache: Optional[dict] = None  # 内存单例
+
+
+def _load_failed_daily() -> dict:
+    global _failed_daily_cache
+    if _failed_daily_cache is not None:
+        return _failed_daily_cache
+    if not _os.path.exists(_HK_DAILY_FAILED_PATH):
+        _failed_daily_cache = {}
+        return _failed_daily_cache
+    try:
+        with open(_HK_DAILY_FAILED_PATH, "r", encoding="utf-8") as f:
+            _failed_daily_cache = _json.load(f)
+    except Exception:
+        _failed_daily_cache = {}
+    return _failed_daily_cache
+
+
+def _save_failed_daily() -> None:
+    if _failed_daily_cache is None:
+        return
+    try:
+        _os.makedirs(_os.path.dirname(_HK_DAILY_FAILED_PATH), exist_ok=True)
+        with open(_HK_DAILY_FAILED_PATH, "w", encoding="utf-8") as f:
+            _json.dump(_failed_daily_cache, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        logger.debug(f"保存 failed sidecar 失败: {e}")
+
+
+def _mark_failed(code: str, err: str) -> None:
+    """attempts+1 记录失败"""
+    fd = _load_failed_daily()
+    prev = fd.get(code, {})
+    fd[code] = {
+        "attempts": int(prev.get("attempts", 0)) + 1,
+        "last_try": _datetime.now().isoformat(timespec="seconds"),
+        "last_error": str(err)[:200],
+    }
+
+
+def _clear_failed(code: str) -> None:
+    fd = _load_failed_daily()
+    if code in fd:
+        fd.pop(code, None)
+
+
+def _is_dead_code(code: str) -> bool:
+    fd = _load_failed_daily()
+    rec = fd.get(code)
+    return bool(rec and int(rec.get("attempts", 0)) >= _FAILED_MAX_ATTEMPTS)
+
+
+# ---------- Cache (永久有效) ----------
+def _load_daily_cache(code: str) -> Optional[pd.DataFrame]:
+    """B47: 缓存永久有效（历史日线是不变量）。仅"缓存文件不存在"才 miss。"""
     p = _daily_cache_path(code)
     if not _os.path.exists(p):
         return None
     try:
-        age_days = (time.time() - _os.path.getmtime(p)) / 86400
-        if age_days > max_age_days:
-            return None
         with open(p, "rb") as f:
             return _pickle.load(f)
     except Exception:
@@ -423,25 +477,36 @@ def _save_daily_cache(code: str, df: pd.DataFrame) -> None:
         logger.debug(f"缓存 {code} 失败: {e}")
 
 
-def _fetch_single_daily(code: str, use_cache: bool = True) -> Optional[pd.DataFrame]:
-    """拉某 code 的全量日线（含 date/open/close/volume/amount）。带 30 天缓存。"""
-    if use_cache:
-        cached = _load_daily_cache(code, max_age_days=30)
+def _fetch_single_daily(code: str, use_cache: bool = True, force: bool = False) -> Optional[pd.DataFrame]:
+    """
+    拉某 code 全量日线。
+    B47 策略:
+      - use_cache 且缓存存在 → 直接返回（永久有效）
+      - force=True 强制重拉
+      - 缓存缺失且未 dead code → API 拉取，成功即保存并清 failed，失败则 attempts+1
+    """
+    if use_cache and not force:
+        cached = _load_daily_cache(code)
         if cached is not None:
             return cached
+    if not force and _is_dead_code(code):
+        return None
     for attempt in range(3):
         try:
             df = ak.stock_hk_daily(symbol=code, adjust="")
             if df is None or df.empty:
+                _mark_failed(code, "empty result")
                 return None
             df["date"] = pd.to_datetime(df["date"])
             df = df[["date", "open", "close", "high", "low", "volume", "amount"]].reset_index(drop=True)
             _save_daily_cache(code, df)
+            _clear_failed(code)
             time.sleep(AKSHARE_SLEEP)
             return df
         except Exception as e:
             if attempt == 2:
                 logger.debug(f"{code} stock_hk_daily 失败: {e}")
+                _mark_failed(code, str(e))
                 return None
             time.sleep(1 + attempt)
     return None
@@ -476,14 +541,18 @@ def get_hk_prices_at_date(
     use_cache: bool = True,
 ) -> dict:
     """
-    B46: 并发拉 codes 在 as_of_date 当天（若停牌，取前 fallback_days 内最近一天）的真实行情。
+    B46+B47: 并发拉 codes 在 as_of_date 当天（若停牌，取前 fallback_days 内最近一天）的真实行情。
+
+    B47 缓存策略:
+      - 缓存永久有效（历史日线是不变量）；只重试 failed / 未缓存的 code
+      - failed sidecar (data/cache/hk_daily_failed.json) 记录 attempts；attempts>=5 视为死码不再尝试
 
     Args:
         codes: 5位港股代码列表
         as_of_date: 基准日
         fallback_days: 停牌容忍窗口
-        max_workers: 并发数
-        use_cache: 使用 30 天磁盘缓存
+        max_workers: 并发数（保留兼容，实际串行 API）
+        use_cache: 使用磁盘缓存
 
     Returns:
         {code: {actual_date, open, close, high, low, volume, amount}}；
@@ -496,20 +565,24 @@ def get_hk_prices_at_date(
     results: dict = {}
     start_t = time.time()
 
-    # 分离：缓存命中 vs 需 API
+    # 分离：缓存命中 / dead-code 跳过 / 需 API
     cached_dfs = {}
     to_fetch = []
+    skipped_dead = []
     for c in codes:
         if use_cache:
-            df = _load_daily_cache(c, max_age_days=30)
+            df = _load_daily_cache(c)
             if df is not None:
                 cached_dfs[c] = df
                 continue
+        if _is_dead_code(c):
+            skipped_dead.append(c)
+            continue
         to_fetch.append(c)
 
     logger.info(
         f"拉取 {len(codes)} 只港股 as_of={as_of_date:%Y-%m-%d} 真实行情"
-        f"（缓存命中 {len(cached_dfs)}，需 API {len(to_fetch)}, fallback={fallback_days}d）"
+        f"（缓存命中 {len(cached_dfs)}，需 API {len(to_fetch)}, 跳过死码 {len(skipped_dead)}, fallback={fallback_days}d）"
     )
 
     # 缓存命中的 code 直接处理
@@ -521,7 +594,7 @@ def get_hk_prices_at_date(
     # 串行 API 调用（V8 上下文冲突要求）
     for i, code in enumerate(to_fetch, 1):
         try:
-            df = _fetch_single_daily(code, use_cache=False)  # 不再查缓存
+            df = _fetch_single_daily(code, use_cache=False)  # _fetch_single_daily 内部会更新 failed/cache
             rec = _pick_at_date(df, as_of_date, fallback_days) if df is not None else None
             if rec is not None:
                 results[code] = rec
@@ -529,8 +602,12 @@ def get_hk_prices_at_date(
             logger.debug(f"{code} 失败: {e}")
         if i % 50 == 0:
             logger.info(f"  API 进度 [{i}/{len(to_fetch)}] 累计命中 {len(results)}, 耗时 {time.time()-start_t:.1f}s")
+
+    # 持久化 failed sidecar
+    _save_failed_daily()
+    fd_size = len(_load_failed_daily())
     logger.info(
         f"完成：{len(results)}/{len(codes)} 命中 as_of={as_of_date:%Y-%m-%d}，"
-        f"耗时 {time.time()-start_t:.1f}s"
+        f"耗时 {time.time()-start_t:.1f}s；failed sidecar: {fd_size}"
     )
     return results
