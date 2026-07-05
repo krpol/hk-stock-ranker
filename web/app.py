@@ -112,6 +112,9 @@ def _load_cashflow_fields() -> pd.DataFrame:
             "current_lease_obligation_prev", "equity_latest",
             # B32: TTM 字段（突降监测）
             "capex_ttm", "da_ttm", "current_lease_obligation_ttm",
+            # B42: 融资活动净利息（CFF 记账时用于 real_fcf 再扣）
+            "interest_paid_financing_3y", "interest_received_investing_3y",
+            "interest_paid_financing_ttm", "interest_received_investing_ttm",
         ]
         usecols = [c for c in wanted if c in head.columns]
         df = pd.read_csv(_FIN_FILE, dtype={"code": str}, usecols=usecols)
@@ -224,6 +227,11 @@ def _attach_cashflow_factors(df: pd.DataFrame) -> pd.DataFrame:
     capex_ttm_s = pd.to_numeric(out.get("capex_ttm"), errors="coerce")
     da_ttm_s = pd.to_numeric(out.get("da_ttm"), errors="coerce")
     lease_ttm_s = pd.to_numeric(out.get("current_lease_obligation_ttm"), errors="coerce")
+    # B42: CFF 净利息（若存在，说明 OCF 未扣利息，需从 real_fcf 再扣一次）
+    int_paid_cff_3y_s = pd.to_numeric(out.get("interest_paid_financing_3y"), errors="coerce")
+    int_recv_inv_3y_s = pd.to_numeric(out.get("interest_received_investing_3y"), errors="coerce")
+    int_paid_cff_ttm_s = pd.to_numeric(out.get("interest_paid_financing_ttm"), errors="coerce")
+    int_recv_inv_ttm_s = pd.to_numeric(out.get("interest_received_investing_ttm"), errors="coerce")
 
     # B31: 公司级 cash_fortress 标记（跨过滤器超级豁免）
     # B32-UI v2: 简化为净现金缓冲 (cash − ibd) > 市值，不再扣 3 年分红
@@ -259,6 +267,10 @@ def _attach_cashflow_factors(df: pd.DataFrame) -> pd.DataFrame:
             capex_ttm=_v(capex_ttm_s),
             da_ttm=_v(da_ttm_s),
             lease_ttm=_v(lease_ttm_s),
+            interest_paid_cff_3y=_v(int_paid_cff_3y_s),
+            interest_received_inv_3y=_v(int_recv_inv_3y_s),
+            interest_paid_cff_ttm=_v(int_paid_cff_ttm_s),
+            interest_received_inv_ttm=_v(int_recv_inv_ttm_s),
         )
         real_fcf_vals.append(r["real_fcf"])
         cov_vals.append(r["coverage_ratio"])

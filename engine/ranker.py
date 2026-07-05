@@ -420,13 +420,17 @@ def rank_stocks(
     _prev_da = _num("prev_da")
     _lease_prev = _num("current_lease_obligation_prev").fillna(0.0)
     _eq = _num("equity_latest")
+    # B42: CFF 净利息 —— 若非空非零，说明 OCF 未扣利息，需再扣
+    _int_paid_cff_ttm = _num("interest_paid_financing_ttm").fillna(0.0)
+    _int_recv_inv_ttm = _num("interest_received_investing_ttm").fillna(0.0)
+    _net_int_ttm = (_int_paid_cff_ttm - _int_recv_inv_ttm).clip(lower=0.0)
 
-    # 当期 TTM real_fcf：D&A 上限取 min(capex+lease, da)
+    # 当期 TTM real_fcf：D&A 上限取 min(capex+lease, da)，再扣净利息(CFF)
     _adj_ttm = pd.concat([(_capex_ttm + _lease_ttm), _da_ttm], axis=1).min(axis=1)
-    real_fcf_ttm = _ocf_ttm - _adj_ttm
-    # 上年 TTM real_fcf
+    real_fcf_ttm = _ocf_ttm - _adj_ttm - _net_int_ttm
+    # 上年 TTM real_fcf（近似复用当期净利息 —— 无 prev_int 字段，先粗略处理）
     _adj_prev = pd.concat([(_prev_capex + _lease_prev), _prev_da], axis=1).min(axis=1)
-    prev_real_fcf_ttm = _prev_ocf - _adj_prev
+    prev_real_fcf_ttm = _prev_ocf - _adj_prev - _net_int_ttm
 
     _eq_pos = _eq.where(_eq > 0)
     merged["real_fcf_ttm"] = real_fcf_ttm.round(2)

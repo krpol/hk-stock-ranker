@@ -174,6 +174,20 @@ FIELD_REGISTRY: dict[str, FieldMeta] = {
         "最新一年内到期租赁", "akshare+yfinance", "point_in_time",
         min_coverage=0.90, sane_range=(0, None), allow_negative=False),
 
+    # ── B42: 融资活动净利息 ──────────────────────────────────────────────
+    "interest_paid_financing_3y": FieldMeta(
+        "3年平均融资活动已付利息", "akshare", "annual",
+        min_coverage=0.50, sane_range=(0, None), allow_negative=False),
+    "interest_received_investing_3y": FieldMeta(
+        "3年平均投资活动已收利息", "akshare", "annual",
+        min_coverage=0.30, sane_range=(0, None), allow_negative=False),
+    "interest_paid_financing_ttm": FieldMeta(
+        "TTM 融资活动已付利息", "akshare", "ttm",
+        min_coverage=0.50, sane_range=(0, None), allow_negative=False),
+    "interest_received_investing_ttm": FieldMeta(
+        "TTM 投资活动已收利息", "akshare", "ttm",
+        min_coverage=0.30, sane_range=(0, None), allow_negative=False),
+
     # ── 数据血缘（B35: 报告期锚点）────────────────────────────────────────
     "fcf_as_of": FieldMeta(
         "FCF组件实际使用的最新报告期", "computed", "point_in_time",

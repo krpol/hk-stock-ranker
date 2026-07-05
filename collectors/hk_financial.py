@@ -40,6 +40,8 @@ DOMAIN_FIELDS: dict = {
              "liquid_financial_assets", "prev_liquid_financial_assets",
              "ocf_3y_avg", "capex_3y_avg", "dep_amortization_3y_avg", "current_lease_obligation_prev", "equity_latest",
              "capex_ttm", "da_ttm", "current_lease_obligation_ttm", "prev_capex", "prev_da",
+             "interest_paid_financing_3y", "interest_received_investing_3y",
+             "interest_paid_financing_ttm", "interest_received_investing_ttm",
              "fcf_as_of", "debt_as_of"],
     "dilution": ["annual_dilution_rate"],
     "growth": [
@@ -1074,6 +1076,10 @@ AK_ITEM_MAP: dict = {
     "capex": ["购建固定资产", "购建无形资产及其他资产"],  # 两项相加
     "depreciation_amortization": ["折旧及摊销"],
     "lease_repayment": ["偿还融资租赁"],
+    # B42: 融资活动利息（若存在则 OCF 未扣利息，real_fcf 需再扣）
+    "interest_paid_financing": ["已付利息(融资)"],
+    # B42: 投资活动利息收入（冲减净利息，避免过度惩罚现金堆积公司）
+    "interest_received_investing": ["已收利息(投资)"],
     # 资产负债表
     "total_assets": ["总资产"],
     "total_liabilities": ["总负债"],
@@ -1245,6 +1251,16 @@ def get_fcf_components(code: str) -> Optional[dict]:
             _yf_series(bs, ["Current Capital Lease Obligation",
                             "CurrentCapitalLeaseObligation"]),
         )
+        # B42: 融资活动已付利息（AK only；yfinance 无对应字段）
+        int_paid_cff_seq = _combine_series(
+            _ak_series(ak_cf, AK_ITEM_MAP["interest_paid_financing"]),
+            {},
+        )
+        # B42: 投资活动已收利息
+        int_recv_inv_seq = _combine_series(
+            _ak_series(ak_cf, AK_ITEM_MAP["interest_received_investing"]),
+            {},
+        )
         # 兜底净资产用：总资产 / 总负债序列
         ta_seq = _combine_series(
             _ak_series(ak_bs, AK_ITEM_MAP["total_assets"]),
@@ -1306,6 +1322,13 @@ def get_fcf_components(code: str) -> Optional[dict]:
         if current_lease_ttm is None:
             current_lease_ttm = 0.0
 
+        # B42: 融资活动已付利息 & 投资活动已收利息
+        # 3y avg 用于 real_fcf；TTM 用于 real_fcf_ttm
+        int_paid_cff_3y = _avg_n(int_paid_cff_seq, 3, take_abs=True)
+        int_recv_inv_3y = _avg_n(int_recv_inv_seq, 3, take_abs=True)
+        int_paid_cff_ttm = _nth(int_paid_cff_seq, 0, take_abs=True)
+        int_recv_inv_ttm = _nth(int_recv_inv_seq, 0, take_abs=True)
+
         # B35: 数据血缘 —— 记录 OCF 序列实际使用的最新报告期（时效锚点）
         _as_of = None
         if ocf_seq:
@@ -1326,6 +1349,11 @@ def get_fcf_components(code: str) -> Optional[dict]:
             # B33: 上年同期 capex/da（现金流动量）
             "prev_capex": prev_capex,
             "prev_da": prev_da,
+            # B42: 融资活动净利息（OCF 未扣利息时 real_fcf 需再扣）
+            "interest_paid_financing_3y": int_paid_cff_3y,
+            "interest_received_investing_3y": int_recv_inv_3y,
+            "interest_paid_financing_ttm": int_paid_cff_ttm,
+            "interest_received_investing_ttm": int_recv_inv_ttm,
             # B35: 数据血缘
             "fcf_as_of": _as_of,
         }
@@ -1748,6 +1776,11 @@ def collect_financial_data(code: str, forward_div_override: Optional[float] = No
         # B33: 上年同期 capex/da
         prev_capex = fcf_comps.get("prev_capex")
         prev_da = fcf_comps.get("prev_da")
+        # B42: 融资净利息
+        interest_paid_financing_3y = fcf_comps.get("interest_paid_financing_3y")
+        interest_received_investing_3y = fcf_comps.get("interest_received_investing_3y")
+        interest_paid_financing_ttm = fcf_comps.get("interest_paid_financing_ttm")
+        interest_received_investing_ttm = fcf_comps.get("interest_received_investing_ttm")
     except Exception as e:
         logger.warning(f"[{code}] fcf_components 采集失败: {e}")
         ocf_3y_avg = None
@@ -1760,6 +1793,10 @@ def collect_financial_data(code: str, forward_div_override: Optional[float] = No
         current_lease_obligation_ttm = None
         prev_capex = None
         prev_da = None
+        interest_paid_financing_3y = None
+        interest_received_investing_3y = None
+        interest_paid_financing_ttm = None
+        interest_received_investing_ttm = None
 
     # ── dilution ─────────────────────────────────────────────────
     try:
@@ -1807,6 +1844,10 @@ def collect_financial_data(code: str, forward_div_override: Optional[float] = No
         "current_lease_obligation_ttm": current_lease_obligation_ttm,
         "prev_capex": prev_capex,
         "prev_da": prev_da,
+        "interest_paid_financing_3y": interest_paid_financing_3y,
+        "interest_received_investing_3y": interest_received_investing_3y,
+        "interest_paid_financing_ttm": interest_paid_financing_ttm,
+        "interest_received_investing_ttm": interest_received_investing_ttm,
     }
 
     if forward_div_override is not None:

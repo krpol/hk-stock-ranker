@@ -44,14 +44,20 @@ def compute_real_fcf(
     capex: Optional[float],
     dep_3y: Optional[float],
     lease_principal: Optional[float],
+    interest_paid_cff: Optional[float] = None,
+    interest_received_inv: Optional[float] = None,
 ) -> Optional[float]:
-    """剩余可用现金流 = OCF − min(CapEx + Lease, D&A)。
+    """剩余可用现金流 = OCF − min(CapEx + Lease, D&A) − max(净利息(CFF), 0)。
 
     OCF 缺失则返回 None；其他缺失按 0 处理。
     若 D&A 缺失/<=0 不取 min（直接用 capex + lease）。
 
     B32: 第二个参数从 capex_3y_avg 改为 capex_ttm 以提升敏感性；
     函数签名为兼容保留原参数名，调用方可传 capex_ttm 或 capex_3y。
+
+    B42: 新增 CFF 净利息扣减 —— 若公司将「已付利息」放在融资活动段（CFF），
+    则 OCF 未扣利息，此处需再扣一次「已付利息(CFF) − 已收利息(投资)」（clip 到 0）。
+    若 interest_paid_cff 为 None 或 0，说明 OCF 已含利息扣减（多数 CFO 记账），不再扣。
     """
     if ocf_3y is None:
         return None
@@ -60,7 +66,13 @@ def compute_real_fcf(
     deduct = cx + lease
     if dep_3y is not None and dep_3y > 0:
         deduct = min(deduct, dep_3y)
-    return ocf_3y - deduct
+    base = ocf_3y - deduct
+    # B42: CFF 净利息扣减
+    if interest_paid_cff is not None and interest_paid_cff > 0:
+        net_int = interest_paid_cff - (interest_received_inv or 0.0)
+        if net_int > 0:
+            base -= net_int
+    return base
 
 
 def compute_real_fcf_ttm(
@@ -68,10 +80,12 @@ def compute_real_fcf_ttm(
     capex_ttm: Optional[float],
     da_ttm: Optional[float],
     lease_ttm: Optional[float],
+    interest_paid_cff_ttm: Optional[float] = None,
+    interest_received_inv_ttm: Optional[float] = None,
 ) -> Optional[float]:
     """B32: TTM 口径的剩余 CF，用于突降监测。
 
-    real_fcf_ttm = OCF_TTM − min(CapEx_TTM + Lease_TTM, D&A_TTM)
+    real_fcf_ttm = OCF_TTM − min(CapEx_TTM + Lease_TTM, D&A_TTM) − max(净利息 CFF_TTM, 0)  (B42)
     """
     if ocf_ttm is None:
         return None
@@ -80,7 +94,12 @@ def compute_real_fcf_ttm(
     deduct = cx + lease
     if da_ttm is not None and da_ttm > 0:
         deduct = min(deduct, da_ttm)
-    return ocf_ttm - deduct
+    base = ocf_ttm - deduct
+    if interest_paid_cff_ttm is not None and interest_paid_cff_ttm > 0:
+        net_int = interest_paid_cff_ttm - (interest_received_inv_ttm or 0.0)
+        if net_int > 0:
+            base -= net_int
+    return base
 
 
 def compute_drop_ratio(
@@ -171,11 +190,24 @@ def evaluate(
     capex_ttm: Optional[float] = None,
     da_ttm: Optional[float] = None,
     lease_ttm: Optional[float] = None,
+    # B42: 融资活动净利息（3y 与 TTM）
+    interest_paid_cff_3y: Optional[float] = None,
+    interest_received_inv_3y: Optional[float] = None,
+    interest_paid_cff_ttm: Optional[float] = None,
+    interest_received_inv_ttm: Optional[float] = None,
 ) -> dict:
     """一次性计算 real_fcf / coverage / rating / real_fcf_ttm / drop_ratio。"""
-    real_fcf = compute_real_fcf(ocf_3y, capex_3y, dep_3y, lease_principal)
+    real_fcf = compute_real_fcf(
+        ocf_3y, capex_3y, dep_3y, lease_principal,
+        interest_paid_cff=interest_paid_cff_3y,
+        interest_received_inv=interest_received_inv_3y,
+    )
     cov = compute_coverage_ratio(real_fcf, ibd, cash, equity)
-    real_fcf_ttm = compute_real_fcf_ttm(ocf_ttm, capex_ttm, da_ttm, lease_ttm)
+    real_fcf_ttm = compute_real_fcf_ttm(
+        ocf_ttm, capex_ttm, da_ttm, lease_ttm,
+        interest_paid_cff_ttm=interest_paid_cff_ttm,
+        interest_received_inv_ttm=interest_received_inv_ttm,
+    )
     drop_ratio = compute_drop_ratio(real_fcf_ttm, real_fcf)
     rating = classify_rating(real_fcf, cov, cash_fortress, drop_ratio)
     return {
