@@ -19,57 +19,5 @@
     "dilution": "fail",
     "dividend": "fail",
     "growth": "fail"
-  },
-  "09869": {
-    "buyback": "get_fiscal_year_dates returned None (likely yfinance unavailable)",
-    "dividend": "no fiscal periods found (likely yfinance unavailable)"
-  },
-  "09885": {
-    "buyback": "get_fiscal_year_dates returned None (likely yfinance unavailable)",
-    "dividend": "no fiscal periods found (likely yfinance unavailable)"
-  },
-  "09889": {
-    "buyback": "get_fiscal_year_dates returned None (likely yfinance unavailable)",
-    "dividend": "no fiscal periods found (likely yfinance unavailable)"
-  },
-  "09896": {
-    "buyback": "get_fiscal_year_dates returned None (likely yfinance unavailable)",
-    "dividend": "no fiscal periods found (likely yfinance unavailable)"
-  },
-  "09898": {
-    "buyback": "get_fiscal_year_dates returned None (likely yfinance unavailable)",
-    "dividend": "no fiscal periods found (likely yfinance unavailable)"
-  },
-  "09908": {
-    "buyback": "get_fiscal_year_dates returned None (likely yfinance unavailable)",
-    "dividend": "no fiscal periods found (likely yfinance unavailable)"
-  },
-  "09919": {
-    "buyback": "get_fiscal_year_dates returned None (likely yfinance unavailable)",
-    "dividend": "no fiscal periods found (likely yfinance unavailable)"
-  },
-  "09922": {
-    "buyback": "get_fiscal_year_dates returned None (likely yfinance unavailable)",
-    "dividend": "no fiscal periods found (likely yfinance unavailable)"
-  },
-  "09927": {
-    "buyback": "get_fiscal_year_dates returned None (likely yfinance unavailable)",
-    "dividend": "no fiscal periods found (likely yfinance unavailable)"
-  },
-  "09928": {
-    "buyback": "get_fiscal_year_dates returned None (likely yfinance unavailable)",
-    "dividend": "no fiscal periods found (likely yfinance unavailable)"
-  },
-  "09930": {
-    "buyback": "get_fiscal_year_dates returned None (likely yfinance unavailable)",
-    "dividend": "no fiscal periods found (likely yfinance unavailable)"
-  },
-  "09936": {
-    "buyback": "get_fiscal_year_dates returned None (likely yfinance unavailable)",
-    "dividend": "no fiscal periods found (likely yfinance unavailable)"
-  },
-  "09959": {
-    "buyback": "get_fiscal_year_dates returned None (likely yfinance unavailable)",
-    "dividend": "no fiscal periods found (likely yfinance unavailable)"
   }
 }
