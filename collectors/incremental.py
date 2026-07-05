@@ -38,6 +38,57 @@ FAILED_SIDECAR = os.path.join(CSV_DIR, "hk_financial_failed.json")
 EMPTY_SIDECAR = os.path.join(CSV_DIR, "hk_financial_empty.json")
 
 
+# ============ B45: stale 财务数据扫描 ============
+# 早期采集失败（如 yfinance 拿不到财年 → get_fiscal_year_dates 返回 None → pipeline 提前退出）
+# 会留下 dividend/buyback 写了但核心字段全 NaN 的股票。此处提供扫描能力，
+# 供 main.py --update / --rebuild-pool 尾部自动补采。
+KEY_FIELDS_STALE = [
+    "ocf_3y_avg",
+    "equity_latest",
+    "total_liability_ratio",
+    "ttm_revenue",
+    "roe",
+    "net_debt_ratio",
+]
+STALE_NAN_THRESHOLD = 3  # 关键字段中 NaN 数 >= 该阈值 视为 stale
+
+
+def scan_stale_codes(
+    fin_df: pd.DataFrame,
+    pool_codes: Optional[Iterable[str]] = None,
+    threshold: int = STALE_NAN_THRESHOLD,
+    key_fields: Optional[list] = None,
+) -> list:
+    """
+    扫描 hk_financial 中关键字段 NaN 项数 >= threshold 的 code。
+
+    参数:
+        fin_df: hk_financial 数据框（须含 code 列）
+        pool_codes: 若提供，仅扫描 pool 内的 code
+        threshold: NaN 计数阈值（含）
+        key_fields: 覆盖默认 KEY_FIELDS_STALE
+
+    返回:
+        stale code 列表（5 位 zfill）
+    """
+    if fin_df is None or fin_df.empty:
+        return []
+    kf = key_fields or KEY_FIELDS_STALE
+    kf = [c for c in kf if c in fin_df.columns]
+    if not kf:
+        return []
+    df = fin_df.copy()
+    df["code"] = df["code"].astype(str).str.zfill(5)
+    if pool_codes is not None:
+        pc = {str(c).zfill(5) for c in pool_codes}
+        df = df[df["code"].isin(pc)]
+    if df.empty:
+        return []
+    nan_count = df[kf].isna().sum(axis=1)
+    stale_mask = nan_count >= threshold
+    return df.loc[stale_mask, "code"].tolist()
+
+
 # ── Sidecar I/O ─────────────────────────────────────────────────
 def load_failed() -> dict:
     """{code: {domain: reason}}"""

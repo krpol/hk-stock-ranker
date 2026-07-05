@@ -46,6 +46,59 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+def _run_stale_scan_and_refresh(stock_list, forward_div_map, tag: str = "stale-scan"):
+    """
+    B45: 扫描 hk_financial 关键字段 stale 股票并自动补采。
+    由 --update / --rebuild-pool 尾部调用；受 STALE_FINANCIAL_SCAN 配置控制。
+    """
+    from config.settings import STALE_FINANCIAL_SCAN
+    if not STALE_FINANCIAL_SCAN.get("enabled", True):
+        logger.info(f"{tag}: STALE_FINANCIAL_SCAN.enabled=False，跳过")
+        return
+    from collectors.incremental import (
+        scan_stale_codes,
+        incremental_update_financial,
+        KEY_FIELDS_STALE,
+        load_failed,
+        load_empty,
+    )
+    fin = load_financial_data()
+    if fin.empty:
+        logger.info(f"{tag}: hk_financial 为空，跳过扫描")
+        return
+    pool_codes = set(stock_list["code"].astype(str).str.zfill(5).tolist()) if stock_list is not None and not stock_list.empty else None
+    threshold = STALE_FINANCIAL_SCAN.get("threshold", 3)
+    stale = scan_stale_codes(fin, pool_codes=pool_codes, threshold=threshold)
+    logger.info(f"{tag}: 关键字段 NaN>={threshold} 扫描完成，stale={len(stale)} 只 {KEY_FIELDS_STALE}")
+    if not stale:
+        logger.info(f"{tag}: 未发现 stale ✅")
+        return
+    logger.warning(f"{tag}: 发现 stale {stale}")
+    if not STALE_FINANCIAL_SCAN.get("auto_refresh", True):
+        logger.info(f"{tag}: auto_refresh=False，仅报告不补采")
+        return
+    workers = STALE_FINANCIAL_SCAN.get("workers", 4)
+    failed_before = len(load_failed())
+    empty_before = len(load_empty())
+    logger.info(f"{tag}: 启动自动补采 {len(stale)} 只 (workers={workers})...")
+    incremental_update_financial(
+        stock_list=stock_list,
+        forward_div_map=forward_div_map,
+        workers=workers,
+        check_dividend_history=False,
+        refresh_codes=stale,
+    )
+    fin_after = load_financial_data()
+    stale_after = scan_stale_codes(fin_after, pool_codes=pool_codes, threshold=threshold)
+    fixed = len(stale) - len(stale_after)
+    logger.info(
+        f"{tag}: 补采完成 stale {len(stale)}→{len(stale_after)}（修复 {fixed}）"
+        f"; failed {failed_before}→{len(load_failed())}, empty {empty_before}→{len(load_empty())}"
+    )
+    if stale_after:
+        logger.warning(f"{tag}: 仍残留 stale {stale_after}")
+
+
 """
 主入口
 用法：
@@ -316,6 +369,16 @@ def run_rebuild_pool(as_of_date: datetime = None, liquidity_window: int = None):
         print(f"\n股票池已构建完成：{len(stock_pool)} 只股票（当日成交额 >= {cap_filter/1e4:.0f}万港元 且 {years}年内有分红记录）")
         print("请每年运行一次 --rebuild-pool 更新股票池。")
 
+    # ---- Step 7: [B45] 财务数据 stale 扫描 + 自动补采（仅当前模式；snapshot-only 跳过）----
+    if not is_snapshot_only:
+        try:
+            from collectors.hk_forward_dividend import get_forward_div_map
+            fwd = get_forward_div_map()
+        except Exception as e:
+            logger.warning(f"预分红 map 加载失败: {e}")
+            fwd = {}
+        _run_stale_scan_and_refresh(stock_pool, fwd, tag="Step 7")
+
 
 def run_backfill_prices(months: int = None, workers: int = 4):
     """
@@ -560,6 +623,11 @@ def run_update(force_refresh: bool = False, refresh_codes: list = None,
             logger.info("  所有股票行业已缓存，跳过")
     except Exception as e:
         logger.warning(f"行业采集失败（不影响主流程）: {e}")
+
+    # ---- Step 3d: [B45] 财务数据 stale 扫描 + 自动补采 ----
+    _run_stale_scan_and_refresh(stock_list, forward_div_map, tag="Step 3d")
+    # 补采后重新加载最新财务数据供 rank 使用
+    financial_df = load_financial_data()
 
     # ---- Step 4: 计算排名 ----
     run_rank_only(stock_list=stock_list, financial_df=financial_df)

@@ -383,3 +383,154 @@ def get_hk_recent_amount_window(
     nonzero = sum(1 for v in results.values() if v > 0)
     logger.info(f"窗口复核完成：{len(results)} 只，其中 {nonzero} 只有有效数据，耗时 {elapsed:.1f}s")
     return results
+
+
+# ============================================================
+# B46: 按 as_of_date 拉取真实历史行情（pool snapshot 流动性字段回填）
+# ============================================================
+import os as _os
+import json as _json
+import pickle as _pickle
+from datetime import datetime as _datetime, timedelta as _timedelta
+
+_HK_DAILY_CACHE_DIR = _os.path.join("data", "cache", "hk_daily")
+
+
+def _daily_cache_path(code: str) -> str:
+    _os.makedirs(_HK_DAILY_CACHE_DIR, exist_ok=True)
+    return _os.path.join(_HK_DAILY_CACHE_DIR, f"{code}.pkl")
+
+
+def _load_daily_cache(code: str, max_age_days: int = 30) -> Optional[pd.DataFrame]:
+    p = _daily_cache_path(code)
+    if not _os.path.exists(p):
+        return None
+    try:
+        age_days = (time.time() - _os.path.getmtime(p)) / 86400
+        if age_days > max_age_days:
+            return None
+        with open(p, "rb") as f:
+            return _pickle.load(f)
+    except Exception:
+        return None
+
+
+def _save_daily_cache(code: str, df: pd.DataFrame) -> None:
+    try:
+        with open(_daily_cache_path(code), "wb") as f:
+            _pickle.dump(df, f)
+    except Exception as e:
+        logger.debug(f"缓存 {code} 失败: {e}")
+
+
+def _fetch_single_daily(code: str, use_cache: bool = True) -> Optional[pd.DataFrame]:
+    """拉某 code 的全量日线（含 date/open/close/volume/amount）。带 30 天缓存。"""
+    if use_cache:
+        cached = _load_daily_cache(code, max_age_days=30)
+        if cached is not None:
+            return cached
+    for attempt in range(3):
+        try:
+            df = ak.stock_hk_daily(symbol=code, adjust="")
+            if df is None or df.empty:
+                return None
+            df["date"] = pd.to_datetime(df["date"])
+            df = df[["date", "open", "close", "high", "low", "volume", "amount"]].reset_index(drop=True)
+            _save_daily_cache(code, df)
+            time.sleep(AKSHARE_SLEEP)
+            return df
+        except Exception as e:
+            if attempt == 2:
+                logger.debug(f"{code} stock_hk_daily 失败: {e}")
+                return None
+            time.sleep(1 + attempt)
+    return None
+
+
+def _pick_at_date(df: pd.DataFrame, as_of: _datetime, fallback_days: int = 5) -> Optional[dict]:
+    """从日线里取 as_of 当天（或前 fallback_days 内最近交易日）的行情。"""
+    if df is None or df.empty:
+        return None
+    as_of_ts = pd.Timestamp(as_of.date() if hasattr(as_of, "date") else as_of)
+    lo = as_of_ts - pd.Timedelta(days=fallback_days)
+    hit = df[(df["date"] >= lo) & (df["date"] <= as_of_ts)]
+    if hit.empty:
+        return None
+    row = hit.sort_values("date").iloc[-1]
+    return {
+        "actual_date": row["date"].strftime("%Y-%m-%d"),
+        "open": float(row["open"]) if pd.notna(row["open"]) else None,
+        "close": float(row["close"]) if pd.notna(row["close"]) else None,
+        "high": float(row["high"]) if pd.notna(row["high"]) else None,
+        "low": float(row["low"]) if pd.notna(row["low"]) else None,
+        "volume": float(row["volume"]) if pd.notna(row["volume"]) else None,
+        "amount": float(row["amount"]) if pd.notna(row["amount"]) else None,
+    }
+
+
+def get_hk_prices_at_date(
+    codes: list,
+    as_of_date: _datetime,
+    fallback_days: int = 5,
+    max_workers: int = 8,
+    use_cache: bool = True,
+) -> dict:
+    """
+    B46: 并发拉 codes 在 as_of_date 当天（若停牌，取前 fallback_days 内最近一天）的真实行情。
+
+    Args:
+        codes: 5位港股代码列表
+        as_of_date: 基准日
+        fallback_days: 停牌容忍窗口
+        max_workers: 并发数
+        use_cache: 使用 30 天磁盘缓存
+
+    Returns:
+        {code: {actual_date, open, close, high, low, volume, amount}}；
+        无数据的 code 不出现在返回 dict 中
+    """
+    # NB: ak.stock_hk_daily 内部使用 mini_racer (V8) 执行 JS，多线程会导致
+    #     "Check failed: !pool->IsInitialized()." fatal crash。这里强制串行。
+    #     缓存命中的直接内存读取，仅缓存缺失走 API。
+    codes = [str(c).zfill(5) for c in codes]
+    results: dict = {}
+    start_t = time.time()
+
+    # 分离：缓存命中 vs 需 API
+    cached_dfs = {}
+    to_fetch = []
+    for c in codes:
+        if use_cache:
+            df = _load_daily_cache(c, max_age_days=30)
+            if df is not None:
+                cached_dfs[c] = df
+                continue
+        to_fetch.append(c)
+
+    logger.info(
+        f"拉取 {len(codes)} 只港股 as_of={as_of_date:%Y-%m-%d} 真实行情"
+        f"（缓存命中 {len(cached_dfs)}，需 API {len(to_fetch)}, fallback={fallback_days}d）"
+    )
+
+    # 缓存命中的 code 直接处理
+    for code, df in cached_dfs.items():
+        rec = _pick_at_date(df, as_of_date, fallback_days)
+        if rec is not None:
+            results[code] = rec
+
+    # 串行 API 调用（V8 上下文冲突要求）
+    for i, code in enumerate(to_fetch, 1):
+        try:
+            df = _fetch_single_daily(code, use_cache=False)  # 不再查缓存
+            rec = _pick_at_date(df, as_of_date, fallback_days) if df is not None else None
+            if rec is not None:
+                results[code] = rec
+        except Exception as e:
+            logger.debug(f"{code} 失败: {e}")
+        if i % 50 == 0:
+            logger.info(f"  API 进度 [{i}/{len(to_fetch)}] 累计命中 {len(results)}, 耗时 {time.time()-start_t:.1f}s")
+    logger.info(
+        f"完成：{len(results)}/{len(codes)} 命中 as_of={as_of_date:%Y-%m-%d}，"
+        f"耗时 {time.time()-start_t:.1f}s"
+    )
+    return results

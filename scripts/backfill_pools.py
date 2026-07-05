@@ -653,6 +653,39 @@ def run_backfill(
             logger.warning(f"[{key}] 池为空，跳过保存")
             summary[key] = 0
             continue
+
+        # ---- B46: 用 as_of 当天真实行情覆盖 price/volume/amount/market_cap ----
+        # 原 pool.price/amount 来自 get_hk_stock_list()（AKShare 实时 spot，跑脚本当天值），
+        # 与 as_of_date 无关；此处调 stock_hk_daily 覆盖为真实历史值。
+        try:
+            from collectors.hk_price import get_hk_prices_at_date
+            pool_codes = pool["code"].astype(str).str.zfill(5).tolist()
+            real = get_hk_prices_at_date(pool_codes, as_of, fallback_days=7)
+            if real:
+                pool = pool.copy()
+                pool["code"] = pool["code"].astype(str).str.zfill(5)
+                hit = 0
+                for i, r in pool.iterrows():
+                    c = r["code"]
+                    rec = real.get(c)
+                    if not rec or rec.get("close") is None:
+                        continue
+                    if "price" in pool.columns:
+                        pool.at[i, "price"] = rec["close"]
+                    for k_src, k_dst in [("open", "今开"), ("high", "最高"), ("low", "最低")]:
+                        if k_dst in pool.columns and rec.get(k_src) is not None:
+                            pool.at[i, k_dst] = rec[k_src]
+                    if "volume" in pool.columns:
+                        pool.at[i, "volume"] = rec["volume"]
+                    if "amount" in pool.columns:
+                        pool.at[i, "amount"] = rec["amount"]
+                    if "market_cap" in pool.columns:
+                        pool.at[i, "market_cap"] = rec["amount"]
+                    hit += 1
+                logger.info(f"[{key}] B46 流动性字段回填：{hit}/{len(pool)} 只命中真实价")
+        except Exception as e:
+            logger.warning(f"[{key}] B46 真实价回填失败（保留原值）: {e}")
+
         _store.save_stock_pool_snapshot(pool, as_of)
         summary[key] = len(pool)
         logger.info(f"[{key}] 保存 {len(pool)} 只")

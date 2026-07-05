@@ -27,3 +27,7 @@ logs/
 # Sidecar transient state（保留以便审计；如需排除可取消注释）
 # data/csv/hk_financial_failed.json
 # data/csv/hk_financial_empty.json
+
+# B46: hk daily 磁盘缓存
+data/cache/
+
