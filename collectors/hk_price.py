@@ -444,6 +444,16 @@ def _mark_failed(code: str, err: str) -> None:
     }
 
 
+def _mark_dead(code: str, err: str) -> None:
+    """立即标记为死码（跳过后续所有尝试）"""
+    fd = _load_failed_daily()
+    fd[code] = {
+        "attempts": _FAILED_MAX_ATTEMPTS,
+        "last_try": _datetime.now().isoformat(timespec="seconds"),
+        "last_error": f"[dead] {str(err)[:200]}",
+    }
+
+
 def _clear_failed(code: str) -> None:
     fd = _load_failed_daily()
     if code in fd:
@@ -497,12 +507,27 @@ def _fetch_single_daily(code: str, use_cache: bool = True, force: bool = False) 
             if df is None or df.empty:
                 _mark_failed(code, "empty result")
                 return None
+            # B47.1: 检查数据结构。债券/衍生品/未上市新股 (40xxx/85xxx/89xxx 等)
+            # 会返回不含 date 列的异常结构，直接标记死码不再重试
+            if "date" not in df.columns:
+                _mark_dead(code, f"unsupported symbol type (cols={list(df.columns)[:5]})")
+                return None
             df["date"] = pd.to_datetime(df["date"])
             df = df[["date", "open", "close", "high", "low", "volume", "amount"]].reset_index(drop=True)
             _save_daily_cache(code, df)
             _clear_failed(code)
             time.sleep(AKSHARE_SLEEP)
             return df
+        except KeyError as e:
+            # KeyError('date') 属于符号类型不支持，直接死码
+            if "'date'" in str(e) or str(e) == "'date'":
+                _mark_dead(code, f"KeyError: {e}")
+                return None
+            if attempt == 2:
+                logger.debug(f"{code} stock_hk_daily 失败: {e}")
+                _mark_failed(code, str(e))
+                return None
+            time.sleep(1 + attempt)
         except Exception as e:
             if attempt == 2:
                 logger.debug(f"{code} stock_hk_daily 失败: {e}")
