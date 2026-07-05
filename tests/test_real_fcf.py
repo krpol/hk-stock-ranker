@@ -232,3 +232,60 @@ def test_evaluate_with_ttm_severe_drop():
     assert r["drop_ratio"] < 0
     # 原 STRONG → 下调两档 → WARN
     assert r["fcf_rating"] == "WARN"
+
+
+# ────── B43: 对称升级测试 ──────
+
+def test_rating_upgrade_ttm_1_5x():
+    """B43: TTM real_fcf 达到 3y avg 1.5x → 升一档"""
+    from engine.real_fcf import classify_rating
+    # base = WARN (cov 0.18), drop_ratio = 1.6 → 升一档 → OK
+    r = classify_rating(real_fcf=50e8, coverage_ratio=0.18, drop_ratio=1.6)
+    assert r == "OK"
+
+
+def test_rating_upgrade_ttm_2_5x():
+    """B43: TTM real_fcf 达到 3y avg 2.5x → 升两档"""
+    from engine.real_fcf import classify_rating
+    # base = WARN (cov 0.18), drop_ratio = 3.0 → 升两档 → STRONG
+    r = classify_rating(real_fcf=50e8, coverage_ratio=0.18, drop_ratio=3.0)
+    assert r == "STRONG"
+
+
+def test_rating_upgrade_from_drop():
+    """B43: base=DROP 可升级"""
+    from engine.real_fcf import classify_rating
+    # cov=0.10 → DROP; drop_ratio=1.6 → 升一档 → WARN
+    r = classify_rating(real_fcf=10e8, coverage_ratio=0.10, drop_ratio=1.6)
+    assert r == "WARN"
+
+
+def test_rating_upgrade_skip_strong():
+    """B43: STRONG 已在顶端，不再升"""
+    from engine.real_fcf import classify_rating
+    r = classify_rating(real_fcf=100e8, coverage_ratio=1.5, drop_ratio=3.0)
+    assert r == "STRONG"
+
+
+def test_rating_no_upgrade_normal_ratio():
+    """B43: drop_ratio ∈ (0.3, 1.5) 不变化"""
+    from engine.real_fcf import classify_rating
+    # base=WARN, drop_ratio=1.0 → 无变化
+    r = classify_rating(real_fcf=50e8, coverage_ratio=0.18, drop_ratio=1.0)
+    assert r == "WARN"
+
+
+def test_evaluate_hk_beikong_like():
+    """B43: 03718 北控城市资源类 - TTM 大幅优于 3y avg"""
+    from engine.real_fcf import evaluate
+    # 3y: OCF=6亿 CapEx=2.83 D&A=5.58 net_int=0.85 → real_fcf ≈ 2.35
+    # TTM: OCF=9亿 CapEx=2.83 D&A=5.12 net_int=0.65 → real_fcf_ttm ≈ 5.49
+    # drop_ratio = 5.49/2.35 ≈ 2.34 → 落在 [1.5, 2.5) → 升一档
+    r = evaluate(6.03e8, 2.83e8, 5.58e8, 0,
+                 ibd=25e8, cash=13e8, equity=32e8,
+                 ocf_ttm=8.97e8, capex_ttm=2.83e8, da_ttm=5.12e8, lease_ttm=0,
+                 interest_paid_cff_3y=0.95e8, interest_received_inv_3y=0.10e8,
+                 interest_paid_cff_ttm=0.69e8, interest_received_inv_ttm=0.04e8)
+    assert 1.5 <= r["drop_ratio"] < 2.5
+    # base WARN (cov ≈ 0.196), 升一档 → OK
+    assert r["fcf_rating"] == "OK"

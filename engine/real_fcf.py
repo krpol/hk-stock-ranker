@@ -22,6 +22,10 @@ B31 + B32: 剩余可用现金流偿债覆盖率指标。
 降级矩阵（B32 突降叠加，AAA/N/A 不降级）：
     drop_ratio < 0.3：评级下调一档
     drop_ratio < 0  ：评级下调两档
+
+升级矩阵（B43 对称升级，AAA/N/A/STRONG 不升级）：
+    drop_ratio ≥ 1.5：评级上调一档 （TTM real_fcf 显著好于 3y 均值）
+    drop_ratio ≥ 2.5：评级上调两档 （收割期转折股，如 03718 北控城市资源）
 """
 from typing import Optional
 
@@ -35,6 +39,11 @@ THRESHOLD_OK = 1.00
 # B32: 突降阈值
 DROP_RATIO_WARN = 0.30   # 当年 < 30% 3y 平均 → 下调一档
 DROP_RATIO_SEVERE = 0.0  # 转负 → 下调两档
+
+# B43: 对称升级阈值（TTM 显著优于 3y avg 时升档）
+# 用于识别「收割期」转折股（03718 北控城市资源类）
+IMPROVE_RATIO_UP1 = 1.5  # real_fcf_ttm ≥ 1.5 × real_fcf_3y → 升一档
+IMPROVE_RATIO_UP2 = 2.5  # real_fcf_ttm ≥ 2.5 × real_fcf_3y → 升两档
 
 _RATING_ORDER = ["STRONG", "OK", "WARN", "DROP"]
 
@@ -145,6 +154,17 @@ def _downgrade(rating: str, steps: int) -> str:
     return _RATING_ORDER[new_idx]
 
 
+def _upgrade(rating: str, steps: int) -> str:
+    """B43: 在 STRONG → OK → WARN → DROP 链上向上调 steps 档；AAA/N/A/STRONG 不动。"""
+    if rating in ("AAA", "N/A", "STRONG"):
+        return rating
+    if rating not in _RATING_ORDER:
+        return rating
+    idx = _RATING_ORDER.index(rating)
+    new_idx = max(idx - steps, 0)
+    return _RATING_ORDER[new_idx]
+
+
 def classify_rating(
     real_fcf: Optional[float],
     coverage_ratio: Optional[float],
@@ -168,11 +188,16 @@ def classify_rating(
         base = "STRONG"
 
     # B32: 突降降级（AAA 已上面 return；N/A 不会进到这里）
+    # B43: 对称升级 —— TTM 显著优于 3y 时向上调档
     if drop_ratio is not None:
         if drop_ratio < DROP_RATIO_SEVERE:   # 转负 → 下调两档
             base = _downgrade(base, 2)
         elif drop_ratio < DROP_RATIO_WARN:   # < 30% → 下调一档
             base = _downgrade(base, 1)
+        elif drop_ratio >= IMPROVE_RATIO_UP2:  # TTM ≥ 2.5x 3y → 升两档
+            base = _upgrade(base, 2)
+        elif drop_ratio >= IMPROVE_RATIO_UP1:  # TTM ≥ 1.5x 3y → 升一档
+            base = _upgrade(base, 1)
     return base
 
 
