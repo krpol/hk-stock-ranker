@@ -485,15 +485,16 @@ def rank_stocks(
     for src, dst in zip(GROWTH_COLS, ZSCORE_COLS):
         merged[dst] = _winsorized_zscore(merged[src])
     z_df = merged[ZSCORE_COLS].apply(pd.to_numeric, errors="coerce")
-    # B39-r2: 加权平均 —— TTM 回报同比×3.0（主因子），其余×1.0
+    # B39-r2 / B41: 加权平均 —— TTM 回报同比×3.0（主因子），营收/营业利润×1.0
+    # B41-r2: FCF/净资产 权重 0.5（TTM 波动大, 3y 更稳），净现金变化 权重 1.0（广义现金强信号）
     # 用 NaN-safe 加权：sum(w_i * z_i) / sum(w_i for non-NaN)
     GROWTH_WEIGHTS = {
         "growth_zscore_revenue": 1.0,
         "growth_zscore_operating_income": 1.0,
         "growth_zscore_ttm_return": 3.0,
-        "growth_zscore_fcf_equity": 1.0,
+        "growth_zscore_fcf_equity": 0.5,
         "growth_zscore_fcf_momentum": 1.0,
-        "growth_zscore_net_cash_change": 0.5,
+        "growth_zscore_net_cash_change": 1.0,
     }
     weights = pd.Series(GROWTH_WEIGHTS)[ZSCORE_COLS]
     weighted_sum = z_df.mul(weights, axis=1).sum(axis=1, skipna=True, min_count=1)
