@@ -13,6 +13,7 @@ import json
 import logging
 import os
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import TimeoutError as FuturesTimeoutError
 from datetime import datetime
 from typing import Iterable, Optional
 
@@ -348,6 +349,43 @@ def incremental_update_financial(
     now_obj = now or datetime.now()
     now_str = now_obj.strftime("%Y-%m-%d %H:%M:%S")
 
+    # B49: 单只最长容忍时间。yfinance 内部走 curl_cffi，个别 ticker 会挂起且
+    # 无全局超时（2026-08-01 实测 6979.HK 让整个 as_completed 死锁 3.5 小时）。
+    PER_FUTURE_TIMEOUT = int(os.environ.get("FIN_FUTURE_TIMEOUT", "180"))
+    # 每 N 只落一次盘，避免任何异常导致全量采集结果丢失
+    CHECKPOINT_EVERY = int(os.environ.get("FIN_CHECKPOINT_EVERY", "100"))
+
+    def _build_combined(records: list) -> pd.DataFrame:
+        """把 new_records 与 existing 合并成待落盘的 DataFrame（供 checkpoint 与最终保存复用）"""
+        if not records and existing.empty:
+            return pd.DataFrame()
+        if not records:
+            return existing.reset_index(drop=True)
+        new_df = pd.DataFrame(records)
+        new_df["code"] = new_df["code"].astype(str).str.zfill(5)
+        if existing.empty:
+            out = new_df
+        else:
+            existing_reset = existing.reset_index(drop=True)
+            keep_mask = ~existing_reset["code"].isin(new_df["code"])
+            out = pd.concat([existing_reset[keep_mask], new_df], ignore_index=True)
+        if not out.empty:
+            out = out[out["code"].isin(pool_codes)].reset_index(drop=True)
+        return out
+
+    def _checkpoint(records: list, tag: str) -> None:
+        """中途落盘（含 sidecar），失败不影响主流程"""
+        try:
+            partial = _build_combined(records)
+            if partial.empty:
+                return
+            save_financial_data(partial)
+            save_failed(failed_map)
+            save_empty(empty_map)
+            logger.info(f"  [checkpoint] {tag} 已落盘 {len(records)} 条新记录（累计 {len(partial)} 行）")
+        except Exception as e:
+            logger.warning(f"  [checkpoint] {tag} 落盘失败（不影响主流程）: {str(e)[:120]}")
+
     new_records: list[dict] = []
     if to_refresh:
         with ThreadPoolExecutor(max_workers=workers) as exe:
@@ -362,52 +400,63 @@ def incremental_update_financial(
             }
             done = 0
             total = len(futures)
-            for fut in as_completed(futures):
-                code = futures[fut]
-                rec = fut.result()
-                done += 1
-                if done % 25 == 0 or done == total:
-                    logger.info(f"  [{done}/{total}] {code}")
-                if rec is None:
-                    continue
+            pending = set(futures.keys())
+            # B49: 整体超时 = 单只超时 × 并发数的宽松倍数；防止个别 future 永久挂起
+            _overall_timeout = PER_FUTURE_TIMEOUT * max(1, (total // max(1, workers)) + 2)
+            try:
+                for fut in as_completed(futures, timeout=_overall_timeout):
+                    pending.discard(fut)
+                    code = futures[fut]
+                    try:
+                        rec = fut.result(timeout=PER_FUTURE_TIMEOUT)
+                    except Exception as e:
+                        logger.warning(f"  [{code}] 采集异常/超时，记为 failed: {type(e).__name__} {str(e)[:80]}")
+                        failed_map[code] = {
+                            "reason": f"{type(e).__name__}: {str(e)[:150]}",
+                            "last_try": now_str,
+                        }
+                        rec = None
+                    done += 1
+                    if done % 25 == 0 or done == total:
+                        logger.info(f"  [{done}/{total}] {code}")
 
-                # 注入 current_price
-                if code in current_price_map:
-                    rec["current_price"] = current_price_map[code]
+                    if rec is not None:
+                        # 注入 current_price
+                        if code in current_price_map:
+                            rec["current_price"] = current_price_map[code]
 
-                # domains 限制：将不在 domains 的 status 改为 "skip"（不写 row、不写 sidecar）
-                if domains:
-                    status_map = rec.get("_status") or {}
-                    for d in list(status_map.keys()):
-                        if d not in domains:
-                            status_map[d] = "skip"
-                    rec["_status"] = status_map
+                        # domains 限制：将不在 domains 的 status 改为 "skip"（不写 row、不写 sidecar）
+                        if domains:
+                            status_map = rec.get("_status") or {}
+                            for d in list(status_map.keys()):
+                                if d not in domains:
+                                    status_map[d] = "skip"
+                            rec["_status"] = status_map
 
-                # 按 status 合并到现有 row
-                existing_row = existing.loc[code] if (not existing.empty and code in existing.index) else None
-                merged = _merge_record_by_status(existing_row, rec, failed_map, empty_map, now_str)
-                new_records.append(merged)
+                        # 按 status 合并到现有 row
+                        existing_row = existing.loc[code] if (not existing.empty and code in existing.index) else None
+                        merged = _merge_record_by_status(existing_row, rec, failed_map, empty_map, now_str)
+                        new_records.append(merged)
 
-    # 重新构造 DataFrame
-    if not new_records and existing.empty:
-        combined = pd.DataFrame()
-    elif not new_records:
-        combined = existing.reset_index(drop=True)
-    else:
-        new_df = pd.DataFrame(new_records)
-        new_df["code"] = new_df["code"].astype(str).str.zfill(5)
-        if existing.empty:
-            combined = new_df
-        else:
-            existing_reset = existing.reset_index(drop=True)
-            keep_mask = ~existing_reset["code"].isin(new_df["code"])
-            combined = pd.concat(
-                [existing_reset[keep_mask], new_df],
-                ignore_index=True,
-            )
+                    # B49: 中途落盘，避免异常导致全量丢失
+                    if CHECKPOINT_EVERY > 0 and done % CHECKPOINT_EVERY == 0:
+                        _checkpoint(new_records, f"{done}/{total}")
+            except FuturesTimeoutError:
+                # 整体超时：剩余 future 记为 failed（下次 --update 会因 failed_map 自动重试）
+                logger.warning(
+                    f"  as_completed 整体超时（{_overall_timeout}s），"
+                    f"{len(pending)} 只未返回，标记为 failed 供下次重试"
+                )
+                for fut in pending:
+                    code = futures[fut]
+                    failed_map[code] = {
+                        "reason": "future timeout (never returned)",
+                        "last_try": now_str,
+                    }
+                    fut.cancel()
 
-    if not combined.empty:
-        combined = combined[combined["code"].isin(pool_codes)].reset_index(drop=True)
+    # 重新构造 DataFrame（B49: 复用 _build_combined，与 checkpoint 逻辑保持一致）
+    combined = _build_combined(new_records)
 
     save_financial_data(combined)
     save_failed(failed_map)

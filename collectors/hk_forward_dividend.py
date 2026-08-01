@@ -374,11 +374,19 @@ def collect_forward_dividends(
     comparison_rows = []  # 双源对比
     records = []          # 最终使用的预分红记录
 
+    # B49: HKEX 披露易 API 故障时（2026-08 返回 HTTP 500 Runtime Error）可跳过该源。
+    # 决策逻辑本就是东财优先（见下方 L405），HKEX 仅作交叉验证，
+    # 跳过后速度快 200 倍（902 只：9 小时 → 2.6 分钟）。
+    # HKEX 恢复后不设该变量即自动恢复双源。
+    _skip_hkex = os.environ.get("SKIP_HKEX_DIV") == "1"
+    if _skip_hkex:
+        logger.warning("SKIP_HKEX_DIV=1 → 跳过 HKEX 披露易爬取，仅用东方财富单源（无交叉验证）")
+
     for i, code in enumerate(codes):
         logger.info(f"[{i+1}/{len(codes)}] {code} 搜索预分红公告...")
 
         # 两路并行采集
-        hkex_result = get_forward_dividend(code, lookback_days=lookback_days)
+        hkex_result = None if _skip_hkex else get_forward_dividend(code, lookback_days=lookback_days)
         em_result = get_forward_div_from_em(code)
 
         # ── 交叉验证 ──

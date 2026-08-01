@@ -1,10 +1,4 @@
 {
-  "08483": [
-    "growth"
-  ],
-  "09676": [
-    "buyback"
-  ],
   "80016": [
     "buyback"
   ],
@@ -24,8 +18,7 @@
     "buyback"
   ],
   "80992": [
-    "buyback",
-    "debt"
+    "buyback"
   ],
   "81024": [
     "buyback"
