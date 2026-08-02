@@ -512,20 +512,22 @@ def test_D12_interim_md_match_for_aug_fy_anchor_in_non_leap_year():
     out = compute_dividend_fields(records, periods, fy_anchor=(8, 31), today=today,
                                    forward_override=None)
 
-    # B39-r8 修正：信 fiscal_year → 2024-12-06 fy=2024 中期 → 2024-02-29 （6,7 月的 fy=2024 中报期）
-    # 2026-03-06 fy=2025 中期 → 2025-02-28
-    # today=2026-05-24: past_periods=[2026-02-28, 2025-08-31,...]，首期 2026-02-28 分红=0
-    #   → B38 shift → latest = 2025-08-31
-    assert out["latest_period_end"] == "2025-08-31"
-    # 2025-08-31 年报期无派息（fy=2025 年度 2026-07-31 仍 pending，归到 2025-08-31）
-    assert out["latest_period_div_per_share"] == pytest.approx(0.06, abs=1e-6)  # pending 0.06
-    # 同期上年 2024-08-31 ← fy=2024 年度 0.06
-    assert out["latest_period_yoy_div_per_share"] == pytest.approx(0.06, abs=1e-6)
-    # current_fy_end = 2025-08-31
+    # B50 修正 B39-r8：fiscal_year 映射需经 ex_date 裁决
+    #   2024-12-06 fy=2024 中期 → 2024-02-29(+281) vs 2025-02-28(-84) → 选 2025-02-28
+    #   2026-03-06 fy=2025 中期 → 2025-02-28(+371 超窗) vs 2026-02-28(+6) → 选 2026-02-28
+    #   2025-08-01 fy=2024 年度 → 2024-08-31(+335) vs 2025-08-31(-30 年度不可提前) → 2024-08-31
+    #   2026-07-31 fy=2025 年度 → 2025-08-31(+334) → 2025-08-31
+    # today=2026-05-24: past_periods[0]=2026-02-28 有 0.07 → 不触发 B38 shift
+    # 这与本测试 docstring 开头声明的预期一致（B39-r8 曾改断言但未同步 docstring）
+    assert out["latest_period_end"] == "2026-02-28"
+    assert out["latest_period_div_per_share"] == pytest.approx(0.07, abs=1e-6)
+    # 同期上年 2025-02-28 ← 2024-12-06 中期 0.07
+    assert out["latest_period_yoy_div_per_share"] == pytest.approx(0.07, abs=1e-6)
+    # current_fy_end = 2025-08-31（fy_anchor 决定，不受归属影响）
     assert out["current_fy_end"] == "2025-08-31"
-    # FY2025 TTM = [2025-08-31, 2025-02-28] = 0.06(pending) + 0.07(2026-03-06) = 0.13
+    # TTM = [2026-02-28, 2025-08-31] = 0.07 + 0.06 = 0.13
     assert out["fy_div_per_share"] == pytest.approx(0.13, abs=1e-6)
-    # forward_div = FY2025 pending(=0) + future periods pending(=0.06 @2026-08-31) = 0.06
+    # forward_div = 未来期 pending 0.06
     assert out["forward_div_per_share"] == pytest.approx(0.06, abs=1e-6)
     assert "2025-08-31" in out["fiscal_periods"]
     assert "2025-02-28" in out["fiscal_periods"]

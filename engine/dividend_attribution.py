@@ -238,6 +238,72 @@ def compute_dividend_fields(
             return None
         return None
 
+    # B50: fiscal_year 映射结果必须经 ex_date 裁决。
+    #
+    # 背景：东财 fiscal_year 对**跨年财年**用「财年开始的自然年」，而
+    # year_to_period 按「财年结束年」建索引 → 非 12 月财年天然差一年。
+    # 错位程度随财年末月份提前而放大：
+    #   01890 财年 8-31：延迟 +97~+335 天，落在合理区间，映射可用
+    #   01627 财年 3-31：延迟 +518~+521 天，错位整整一年 → 必须修正
+    #
+    # 关键业务规则 —— 年度与中期的除息时序约束不同：
+    #   annual  ：**只能延后**。年度分红必须等年报出具 + 股东大会通过才能除息，
+    #             典型财年结束后 2~5 个月，最长约 12 个月。不可能在财年结束前除息。
+    #   interim ：**可以提前**。中期分红常在半年期结束前就宣派除息
+    #             （如 01890 的 2024-12-06 属于 2025-02-28 中报期，提前 84 天）。
+    #
+    # 裁决：在 fy 与 fy+1 两个候选中，先按类型窗口过滤，再选 |延迟| 最小者。
+    # 都不合格则返回 None，交由 _pick_nearest_period 按距离归属。
+    #
+    # 效果验证：
+    #   01627 年度 fy=2024 → 2024-03-31(+519 超窗) vs 2025-03-31(+154) → 后者 ✅
+    #   01890 年度 fy=2024 → 2024-08-31(+335)      vs 2025-08-31(-30 提前，annual 不允许) → 前者 ✅
+    #   01890 中期 fy=2024 → 2024-02-29(+281)      vs 2025-02-28(-84) → 后者（|84|<|281|）✅
+    #   01890 中期 fy=2025 → 2025-02-28(+371 超窗) vs 2026-02-28(+6)  → 后者 ✅
+    #   02602 中期 fy=2023 → 2023-06-30(+186)      vs 2024-06-30(-180 超 -90 窗) → 前者 ✅
+    _FY_DELAY_MAX = 365
+    _FY_DELAY_MIN_ANNUAL = 0      # 年度/末期分红不可能在财年结束前除息（需等年报+股东大会）
+    # B50-r2: 中期下界不能设得太宽。中报期间隔仅 ~182 天，若下界取 -180，
+    # 相邻两个中报期几乎必然同时落入窗口，而「提前」那个 |delay| 反而更小 → 错归。
+    # 反例：02602 2024-01-02 中期 fy=2023，2023-06-30(+186) vs 2024-06-30(-180)，
+    # -180 窗下会选中后者 → prev_year 从 2.079 虚高到 2.4251。
+    # 实测 01890 的最大提前量是 -84 天，与 _pick_nearest_period 既有的 -90 容差一致。
+    _FY_DELAY_MIN_INTERIM = -90
+    # 特别分配不依赖年报节奏，可随时宣派，但 _classify_distribution 将其归为 annual。
+    # 若用 annual 的 [0,365) 硬边界会误踢提前除息的特别分配。
+    _FY_DELAY_MIN_SPECIAL = -90
+
+    def _is_special(dtype: str) -> bool:
+        s = (dtype or "").strip()
+        return ("特别" in s) or ("特殊" in s)
+
+    def _period_for_fy_validated(fy, kind: str, ex_date: pd.Timestamp,
+                                  dtype: str = "") -> Optional[pd.Timestamp]:
+        if not fy:
+            return None
+        try:
+            fy_int = int(fy)
+        except (TypeError, ValueError):
+            return None
+        if kind == "interim":
+            delay_min = _FY_DELAY_MIN_INTERIM
+        elif _is_special(dtype):
+            delay_min = _FY_DELAY_MIN_SPECIAL
+        else:
+            delay_min = _FY_DELAY_MIN_ANNUAL
+        best = None
+        best_abs = None
+        for cand_fy in (fy_int, fy_int + 1):
+            p = _period_for_fy_kind(cand_fy, kind)
+            if p is None:
+                continue
+            delay = (ex_date - p).days
+            if not (delay_min <= delay < _FY_DELAY_MAX):
+                continue
+            if best_abs is None or abs(delay) < best_abs:
+                best, best_abs = p, abs(delay)
+        return best
+
     for i, rec in enumerate(valid_records):
         ex_date = pd.Timestamp(rec.ex_date).normalize()
         kind = _classify_distribution(rec.distribution_type)
@@ -252,15 +318,17 @@ def compute_dividend_fields(
 
         if kind == "interim" and interim_periods:
             # B39-r8: 优先用 fiscal_year 定位（避免 8 月财年 fy2025 中期延迟 1 年派息时被错归到 fy2026）
-            target_period = _period_for_fy_kind(rec.fiscal_year, "interim") \
-                if rec.fiscal_year else None
+            # B50: 映射结果需经 ex_date 延迟裁决（见上方 _period_for_fy_validated）
+            target_period = _period_for_fy_validated(rec.fiscal_year, "interim", ex_date,
+                                                      rec.distribution_type)
             if target_period is None:
                 # 中报派息典型 0~8 月内，窗口 8 月
                 target_period = _pick_nearest_period(interim_periods, ex_date, max_after_days=240)
         elif kind == "annual" and annual_periods:
             # B39-r8: 优先用 fiscal_year 定位
-            target_period = _period_for_fy_kind(rec.fiscal_year, "annual") \
-                if rec.fiscal_year else None
+            # B50: 同上，需经 ex_date 延迟裁决
+            target_period = _period_for_fy_validated(rec.fiscal_year, "annual", ex_date,
+                                                      rec.distribution_type)
             if target_period is None:
                 # 年度派息可能延迟到 12 个月后（如 09616 case），但窗口不能超过 12 月
                 target_period = _pick_nearest_period(annual_periods, ex_date, max_after_days=365)

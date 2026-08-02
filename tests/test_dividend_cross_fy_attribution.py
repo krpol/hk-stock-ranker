@@ -28,10 +28,18 @@ def _periods_aug31():
 # ---- B11-1: 中期分配跨财年时应归到中报期，不归年报期 ----
 
 def test_interim_distribution_attributed_to_interim_period_across_fy():
-    """01890 case (B39-r8 修正)：
-    FY2025 中期 ex_date=2026-03-06 (延迟 1年+派息)，fiscal_year=2025
-      → 应归到 2025-02-28 (fy2025 的中报期)，不能归到 2026-02-28 (fy2026 中报期，未派)
-    优先信 fiscal_year 而不是 “距离 ex_date 最近”"""
+    """01890 case (B50 修正 B39-r8 的过度修复)：
+
+    记录：中期分配 ex_date=2026-03-06，AKShare 标 fiscal_year=2025
+
+    B39-r8 曾断言应归 2025-02-28（"优先信 fiscal_year"），但那是错的：
+      - 归 2025-02-28 → 除息比该中报期晚 371 天，不合派息节奏
+      - 归 2026-02-28 → 除息比该中报期晚 6 天，典型「财报后立即派息」
+
+    B50 用 ex_date 延迟裁决（interim 窗口 [-180, 365)）在 fy 与 fy+1 中
+    选 |延迟| 最小者 → 命中 2026-02-28，与 B5/B11 badcase 基于真实数据的
+    期望一致（latest_period_end == "2026-02-28"）。
+    """
     today = pd.Timestamp("2026-05-24")
     records = [
         DividendRecord(ex_date=pd.Timestamp("2026-03-06"), amount_hkd=0.07,
@@ -39,14 +47,13 @@ def test_interim_distribution_attributed_to_interim_period_across_fy():
     ]
     out = compute_dividend_fields(records, _periods_aug31(),
                                    fy_anchor=(8, 31), today=today)
-    # B38 shift：past_periods[0]=2026-02-28 分红=0 & 历史同类中报有派→shift → latest=2025-08-31
-    assert out["latest_period_end"] == "2025-08-31"
-    # 2025-08-31 年报期本记录无派息（仅有 2025-02-28 中期 0.07）
-    assert out["latest_period_div_per_share"] == pytest.approx(0.0, abs=1e-6)
-    # 同期上年 = 2024-08-31 也无
-    assert out["latest_period_yoy_end"] == "2024-08-31"
+    # B50: 归到 2026-02-28（延迟 6 天），该期有派息 → 无需 B38 shift
+    assert out["latest_period_end"] == "2026-02-28"
+    assert out["latest_period_div_per_share"] == pytest.approx(0.07, abs=1e-6)
+    # 同期上年 = 2025-02-28，本记录集无派息
+    assert out["latest_period_yoy_end"] == "2025-02-28"
     assert out["latest_period_yoy_div_per_share"] == pytest.approx(0.0, abs=1e-6)
-    # fy_div 窗口 = [2025-08-31, 2025-02-28] 含 0.07
+    # fy_div 窗口 = [2026-02-28, 2025-08-31] 含 0.07
     assert out["fy_div_per_share"] == pytest.approx(0.07, abs=1e-6)
 
 
@@ -71,14 +78,26 @@ def test_annual_distribution_attributed_to_annual_period():
 # ---- B11-3: 完整 01890 数据复现 ----
 
 def test_b11_01890_full_scenario():
-    """01890 完整 4 笔派息归属（B39-r8 修正：具体时间线）：
-      2024-12-06 fy=2024 中期 0.07 → 2024-02-29 (FY2024 中报期, 8月财年中期=上年 2 月)
-      2025-08-01 fy=2024 年度 0.06 → 2024-08-31 (FY2024 年报期)
-      2026-03-06 fy=2025 中期 0.07 → 2025-02-28 (FY2025 中报期)
-      2026-07-31 fy=2025 年度 0.06 → 2025-08-31 pending (FY2025 年报期)
+    """01890 完整 4 笔派息归属（B50 修正 B39-r8）：
 
-    today=2026-05-24, past_periods[0]=2026-02-28 分红=0 → B38 shift 触发
-      → latest_period = 2025-08-31（已 shift）
+    B50 裁决规则：interim 窗口 [-180, 365)，annual 窗口 [0, 365)，
+    在 fy 与 fy+1 两个候选中选 |延迟| 最小者。
+
+      2024-12-06 fy=2024 中期 0.07
+        fy=2024 → 2024-02-29 (+281) 合格 | fy=2025 → 2025-02-28 (-84) 合格
+        → 选 2025-02-28（|84| < |281|）
+      2025-08-01 fy=2024 年度 0.06
+        fy=2024 → 2024-08-31 (+335) 合格 | fy=2025 → 2025-08-31 (-30) 超窗（年度不可提前）
+        → 选 2024-08-31
+      2026-03-06 fy=2025 中期 0.07
+        fy=2025 → 2025-02-28 (+371) 超窗 | fy=2026 → 2026-02-28 (+6) 合格
+        → 选 2026-02-28
+      2026-07-31 fy=2025 年度 0.06
+        fy=2025 → 2025-08-31 (+334) 合格 | fy=2026 → 2026-08-31 (-31) 超窗
+        → 选 2025-08-31（pending，尚未除息? 否——2026-07-31 < today 已除息）
+
+    today=2026-05-24：2026-02-28 期有 0.07 → 无需 B38 shift，latest=2026-02-28。
+    该结果与 B5/B11 badcase 基于真实数据的期望一致。
     """
     today = pd.Timestamp("2026-05-24")
     records = [
@@ -94,15 +113,15 @@ def test_b11_01890_full_scenario():
     out = compute_dividend_fields(records, _periods_aug31(),
                                    fy_anchor=(8, 31), today=today)
 
-    # B38 shift 后 latest = 2025-08-31
-    assert out["latest_period_end"] == "2025-08-31"
-    # 2025-08-31 pending 0.06 (fy=2025 年度)
-    assert out["latest_period_div_per_share"] == pytest.approx(0.06, abs=1e-6)
-    # 同期上年 2024-08-31 done 0.06 (fy=2024 年度)
-    assert out["latest_period_yoy_div_per_share"] == pytest.approx(0.06, abs=1e-6)
-    # TTM = [2025-08-31, 2025-02-28] = 0.06 + 0.07 = 0.13
+    # B50: latest = 2026-02-28（该期有 0.07，不触发 B38 shift）
+    assert out["latest_period_end"] == "2026-02-28"
+    assert out["latest_period_div_per_share"] == pytest.approx(0.07, abs=1e-6)
+    # 同期上年 2025-02-28 = 0.07（2024-12-06 那笔）
+    assert out["latest_period_yoy_end"] == "2025-02-28"
+    assert out["latest_period_yoy_div_per_share"] == pytest.approx(0.07, abs=1e-6)
+    # TTM = [2026-02-28, 2025-08-31] = 0.07 + 0.06 = 0.13
     assert out["fy_div_per_share"] == pytest.approx(0.13, abs=1e-6)
-    # forward = 2026-07-31 pending 0.06
+    # forward = 2026-08-31 期（未到）+ 当前财年 pending
     assert out["forward_div_per_share"] == pytest.approx(0.06, abs=1e-6)
 
 
