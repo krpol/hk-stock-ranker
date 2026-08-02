@@ -142,12 +142,19 @@ cases:
       【B9 实跑验证（2026-06-01）】：B9 复核机制本身工作正常，对 804 只单日 fail 的票补回 344 只。
       01245 当日 amount=68,778 港元 > 1万门槛，单日 Step 2 就通过（未走 B9 复核）。
       但 01245 在 Step 4 「合股/增发过滤」被误杀（B10：has_share_dilution 单点噪声误判）。
-      B10 已修复 + has_share_dilution('01245') 函数级别已返回 False；
-      待最新一轮 rebuild 完成后，01245 即可重新进 pool/financial，恢复 require_present。
-    require_present: false   # 临时禁用：当前后台 rebuild（PID 46053，启动于 2026-06-01 20:10，~3.5h）
-                             # 完成后，01245 才会重新进 financial.csv；届时改回 true 并删除本注释。
+      B10 已修复 + has_share_dilution('01245') 函数级别已返回 False。
+
+      【2026-08-02 结案】01245 已恢复进入 stock_pool（name=NIRAKU）与 hk_financial.csv，
+      按上述待办恢复 require_present: true。
+
+      同时修正断言字段：原用 `name: {exact: NIRAKU}` 探测存在性，但
+      hk_financial.csv 从设计上就不含 name 列（近 12 次提交均无），该断言恒 FAIL。
+      本 case 的真实意图是「01245 不得被流动性/增发过滤误踢出池」，
+      这已由 require_present: true 精确表达（code 不在 financial.csv 即 fail）。
+      再补一条业务字段断言，确保它不只是"存在"而且数据有效。
+    require_present: true
     expect:
-      name: { exact: "NIRAKU" }
+      total_liability_ratio: { non_empty: true }
 
   # ---------------- B11: AKShare fiscal_year 偏移导致中报派息错归 ----------------
   - issue: B11
@@ -168,7 +175,12 @@ cases:
       latest_period_end: { exact: "2026-02-28" }
       latest_period_div_per_share: { approx: 0.07 }
       latest_period_yoy_div_per_share: { approx: 0.07 }
-      forward_div_per_share: { approx: 0.06 }
+      # 原断言 forward_div_per_share ≈ 0.06 是**时间敏感**的，已失效：
+      # 那笔 0.06 的除净日是 2026-07-31，过期后不再是"预"分红，
+      # 会被采集逻辑正确剔除并转入 TTM。2026-08-02 起该断言必然 FAIL。
+      # 改为守护「这笔钱不丢失」——fy_div 应含 0.07(中期) + 0.06(年度) = 0.13。
+      # 教训：badcase 断言应避免依赖"当前时间与某个除净日的相对位置"。
+      fy_div_per_share: { approx: 0.13 }
 
   # ---------------- B50: 跨年财年 fiscal_year 映射错位（B39-r8 回归） ----------------
   - issue: B50
