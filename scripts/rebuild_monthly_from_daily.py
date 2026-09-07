@@ -64,6 +64,10 @@ logger = logging.getLogger(__name__)
 
 OUT_COLS = ["date", "code", "open", "close", "high", "low", "volume", "amount", "close_qfq"]
 
+# B50-r3: 缓存够新阈值。月度更新时，只要日线缓存已含该日期之后的交易日，
+# 就复用缓存，不再重拉（新浪连续请求 ~250 只会挂起连接）。
+FRESH_CUTOFF = pd.Timestamp("2026-08-01")
+
 
 def _resample_monthly(df: pd.DataFrame) -> pd.DataFrame:
     """日线 -> 月度 OHLCV 聚合"""
@@ -91,10 +95,16 @@ def _fetch_qfq_daily(code: str) -> pd.DataFrame:
     失败返回空 DataFrame，调用方回退 close_qfq = close。
     """
     import akshare as ak
+    import socket
 
     for attempt in range(3):
         try:
-            df = ak.stock_hk_daily(symbol=code, adjust="qfq")
+            _prev = socket.getdefaulttimeout()
+            socket.setdefaulttimeout(45)
+            try:
+                df = ak.stock_hk_daily(symbol=code, adjust="qfq")
+            finally:
+                socket.setdefaulttimeout(_prev)
             if df is None or df.empty or "date" not in df.columns:
                 return pd.DataFrame()
             time.sleep(AKSHARE_SLEEP)
@@ -119,7 +129,16 @@ def build_monthly_for_code(
     if _is_dead_code(code) and not force_refresh:
         return pd.DataFrame()
 
-    raw = _fetch_single_daily(code, use_cache=not force_refresh, force=force_refresh)
+    raw = None
+    if force_refresh:
+        # B50-r3: 新浪连续请求 ~250 只会挂起，已缓存且够新（>= FRESH_CUTOFF）的直接复用，
+        # 避免无谓重拉再次触发限流。够新的判定：缓存最新交易日不早于 FRESH_CUTOFF。
+        cached = _load_daily_cache(code)
+        if cached is not None and not cached.empty and "date" in cached.columns:
+            if pd.to_datetime(cached["date"]).max() >= FRESH_CUTOFF:
+                raw = cached
+    if raw is None:
+        raw = _fetch_single_daily(code, use_cache=not force_refresh, force=force_refresh)
     if raw is None or raw.empty:
         return pd.DataFrame()
 

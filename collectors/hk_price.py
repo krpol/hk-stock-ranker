@@ -4,6 +4,7 @@
 """
 import time
 import logging
+import socket
 from typing import Optional
 import requests
 import pandas as pd
@@ -503,7 +504,15 @@ def _fetch_single_daily(code: str, use_cache: bool = True, force: bool = False) 
         return None
     for attempt in range(3):
         try:
-            df = ak.stock_hk_daily(symbol=code, adjust="")
+            # B50-r3: ak.stock_hk_daily 内部 requests.get 无 timeout，
+            # 新浪连续请求 ~250 只后会挂起连接（ESTABLISHED 但永不响应，实测卡 5 小时）。
+            # 用 socket 默认超时兜底，超时后抛 socket.timeout → 走重试，不再无限挂起。
+            _prev_sock_timeout = socket.getdefaulttimeout()
+            socket.setdefaulttimeout(45)
+            try:
+                df = ak.stock_hk_daily(symbol=code, adjust="")
+            finally:
+                socket.setdefaulttimeout(_prev_sock_timeout)
             if df is None or df.empty:
                 _mark_failed(code, "empty result")
                 return None
