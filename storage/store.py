@@ -189,6 +189,30 @@ def load_monthly_price() -> pd.DataFrame:
     return df
 
 
+def load_latest_close_map() -> dict:
+    """
+    B51: 返回 {code: 最新收盘价(close, 不复权)}。
+
+    取自月度价格表每只股票【最新日期】的 close 列。close 语义即
+    「原始（不复权）收盘价，用于 ranking 展示价」，与 current_price 完全一致。
+    该表已持久化（成功采集即缓存），是 current_price 最可靠且最新鲜的来源，
+    避免依赖东财实时接口（不稳定）或股票池旧 price 快照（可能滞后数月）。
+
+    Returns:
+        dict[str, float]，例如 {"06110": 1.12, "00700": 388.0}
+    """
+    df = load_monthly_price()
+    if df.empty or "close" not in df.columns:
+        return {}
+    df = df.sort_values("date")
+    latest = df.groupby("code").tail(1)
+    # 仅保留有效 close（排除 NaN/<=0），code 统一 zfill(5)
+    latest = latest[latest["close"].notna() & (latest["close"] > 0)]
+    latest = latest.copy()
+    latest["code"] = latest["code"].astype(str).str.zfill(5)
+    return dict(zip(latest["code"], latest["close"]))
+
+
 # ============================================================
 # 财务数据（全量覆盖，每次更新时重写）
 # ============================================================

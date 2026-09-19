@@ -21,13 +21,13 @@ import pandas as pd
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
 from config.settings import HK_STOCK_FILTERS, HISTORY_YEARS
-from collectors.hk_price import get_hk_stock_list, get_hk_monthly_price, get_hk_monthly_price_dual, get_hk_current_price
+from collectors.hk_price import get_hk_stock_list, get_hk_monthly_price, get_hk_monthly_price_dual, get_hk_current_price, save_monthly_failed, load_monthly_failed_codes
 from collectors.hk_financial import collect_financial_data, has_dividend_history, has_share_dilution, has_recent_dividend_or_forward
 from collectors.hk_forward_dividend import collect_forward_dividends, get_forward_div_map
 from storage.store import (
     save_stock_list, load_stock_list,
     save_stock_pool, load_stock_pool, get_stock_pool_age_days,
-    save_monthly_price, load_monthly_price,
+    save_monthly_price, load_monthly_price, load_latest_close_map,
     save_financial_data, load_financial_data,
     save_ranking, list_ranking_periods,
     save_industry_data, load_industry_data, upsert_industry_data,
@@ -485,8 +485,13 @@ def run_update(force_refresh: bool = False, refresh_codes: list = None,
     if _os.environ.get("SKIP_PRICE") == "1":
         logger.info("  SKIP_PRICE=1 → 跳过月度价格更新")
     else:
+        # B51: 上次拉取失败的 code（attempts < 死码阈值）本次优先重试
+        retry_codes = set(load_monthly_failed_codes())
+        if retry_codes:
+            logger.info(f"  本次将重试 {len(retry_codes)} 只上次月度价格拉取失败的股票")
+
         for i, (_, row) in enumerate(stock_list.iterrows()):
-            code = row["code"]
+            code = str(row["code"]).zfill(5)
             if (i + 1) % 50 == 0 or i == 0:
                 logger.info(f"  [{i+1}/{len(stock_list)}] {code} {row.get('name', '')}")
             df = get_hk_monthly_price_dual(code, start_date, end_date)
@@ -496,6 +501,8 @@ def run_update(force_refresh: bool = False, refresh_codes: list = None,
         if all_price_dfs:
             combined_price = pd.concat(all_price_dfs, ignore_index=True)
             save_monthly_price(combined_price)
+
+        save_monthly_failed()   # B51: 持久化本月失败记录，供下次启动自动重试
 
     # ---- Step 2b: [B13] 新入池/价格不足股票 5 年回填 ----
     # 触发条件：池内 code 在 hk_monthly_price.csv 中的月数 < HISTORY_YEARS*12*0.8
@@ -566,15 +573,20 @@ def run_update(force_refresh: bool = False, refresh_codes: list = None,
     # ---- Step 3b: 财务数据（增量）----
     logger.info("Step 3b: 采集财务数据（增量 TTL 模式）...")
 
-    # 当前价：对池内全部股票拉一次（轻量），避免在增量过滤后丢失刚复用的旧价
+    # 当前价：优先实时采集；失败时回退到月度价格表最新 close（B51）
     logger.info("  采集当前价格...")
+    latest_close = load_latest_close_map()
     current_price_map = {}
     for i, (_, row) in enumerate(stock_list.iterrows()):
-        code = row["code"]
+        code = str(row["code"]).zfill(5)
         try:
-            current_price_map[code] = get_hk_current_price(code)
+            cp = get_hk_current_price(code)
+            if cp is None:
+                cp = latest_close.get(code)   # 实时价失败 → 回退月度价格缓存
+            current_price_map[code] = cp
         except Exception as e:
             logger.debug(f"current_price {code}: {e}")
+            current_price_map[code] = latest_close.get(code)
         if (i + 1) % 100 == 0:
             logger.info(f"  current_price [{i+1}/{len(stock_list)}]")
 
@@ -650,18 +662,41 @@ def run_rank_only(stock_list: pd.DataFrame = None, financial_df: pd.DataFrame = 
         logger.error("数据不足，无法计算排名")
         return
 
-    # 将 financial 中的 current_price 合并到 stock_list，并避免 merge 冲突
+    # B51: current_price 来源优先级 = 月度价格最新 close > financial current_price > pool price
+    # 修复历史 bug：旧逻辑无条件用股票池 price（可能滞后数月）作 current_price。
+    stock_list = stock_list.copy()
+    stock_list["code"] = stock_list["code"].astype(str).str.zfill(5)
+
+    # 1) 主来源：月度价格表最新 close（最新鲜、已持久化缓存）
+    latest_close = load_latest_close_map()
+    stock_list["current_price"] = stock_list["code"].map(latest_close)
+
+    # 2) 兜底：financial current_price（实时采集，覆盖月度价缺失/异常的 code）
     if "current_price" in financial_df.columns:
-        stock_list = stock_list.copy()
-        if "price" in stock_list.columns:
-            # stock_list 已有有效价格（来自 pool），优先使用并重命名
-            stock_list = stock_list.rename(columns={"price": "current_price"})
-        elif "current_price" not in stock_list.columns:
-            # 从 financial 映射作为回退方案
-            price_map = financial_df.set_index("code")["current_price"].dropna().to_dict()
-            stock_list["current_price"] = stock_list["code"].map(price_map)
+        fin = financial_df.copy()
+        fin["code"] = fin["code"].astype(str).str.zfill(5)
+        fin_price_map = (
+            fin.dropna(subset=["current_price"])
+            .set_index("code")["current_price"]
+            .to_dict()
+        )
+        cur = pd.to_numeric(stock_list["current_price"], errors="coerce")
+        need_fill = cur.isna() | (cur <= 0)
+        if need_fill.any():
+            stock_list.loc[need_fill, "current_price"] = (
+                stock_list.loc[need_fill, "code"].map(fin_price_map)
+            )
         # 从 financial_df 移除 current_price，避免 merge 时的列名冲突
         financial_df = financial_df.drop(columns=["current_price"])
+
+    # 3) 最后兜底：pool price（最老，仅当月度和 financial 都缺失时使用）
+    if "price" in stock_list.columns:
+        cur = pd.to_numeric(stock_list["current_price"], errors="coerce")
+        need_fill = cur.isna() | (cur <= 0)
+        if need_fill.any():
+            stock_list.loc[need_fill, "current_price"] = pd.to_numeric(
+                stock_list.loc[need_fill, "price"], errors="coerce"
+            )
 
     industry_df = load_industry_data()
 

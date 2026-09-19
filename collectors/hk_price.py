@@ -184,6 +184,7 @@ def get_hk_monthly_price(
     Returns:
         DataFrame with columns: date, open, close, high, low, volume, amount
     """
+    code = str(code).zfill(5)   # B51: 统一 5 位，保证 failed sidecar key 一致
     for attempt in range(1, max_retries + 1):
         try:
             df = ak.stock_hk_hist(
@@ -207,6 +208,7 @@ def get_hk_monthly_price(
             df["date"] = pd.to_datetime(df["date"])
             df["code"] = code
             time.sleep(AKSHARE_SLEEP)
+            clear_monthly_failed(code)   # B51: 成功拉取，清除失败记录
             return df[["date", "code", "open", "close", "high", "low", "volume", "amount"]]
         except Exception as e:
             err_str = str(e)
@@ -221,6 +223,7 @@ def get_hk_monthly_price(
                 return pd.DataFrame()
     
     logger.warning(f"[{code}] 月度价格达最大重试次数")
+    mark_monthly_failed(code, "monthly price max retries")   # B51: 网络失败记录，下次启动优先重试
     return pd.DataFrame()
 
 
@@ -465,6 +468,64 @@ def _is_dead_code(code: str) -> bool:
     fd = _load_failed_daily()
     rec = fd.get(code)
     return bool(rec and int(rec.get("attempts", 0)) >= _FAILED_MAX_ATTEMPTS)
+
+
+# ---------- B51: 月度价格 Failed sidecar（失败追踪 + 下次启动优先重试） ----------
+_HK_MONTHLY_FAILED_PATH = _os.path.join("data", "cache", "hk_monthly_price_failed.json")
+
+_failed_monthly_cache: Optional[dict] = None  # 内存单例
+
+
+def _load_failed_monthly() -> dict:
+    global _failed_monthly_cache
+    if _failed_monthly_cache is not None:
+        return _failed_monthly_cache
+    if not _os.path.exists(_HK_MONTHLY_FAILED_PATH):
+        _failed_monthly_cache = {}
+        return _failed_monthly_cache
+    try:
+        with open(_HK_MONTHLY_FAILED_PATH, "r", encoding="utf-8") as f:
+            _failed_monthly_cache = _json.load(f)
+    except Exception:
+        _failed_monthly_cache = {}
+    return _failed_monthly_cache
+
+
+def save_monthly_failed() -> None:
+    """持久化月度价格失败 sidecar（供 main.py Step 2 尾部调用）。"""
+    if _failed_monthly_cache is None:
+        return
+    try:
+        _os.makedirs(_os.path.dirname(_HK_MONTHLY_FAILED_PATH), exist_ok=True)
+        with open(_HK_MONTHLY_FAILED_PATH, "w", encoding="utf-8") as f:
+            _json.dump(_failed_monthly_cache, f, ensure_ascii=False, indent=2)
+    except Exception as e:
+        logger.debug(f"保存 monthly failed sidecar 失败: {e}")
+
+
+def mark_monthly_failed(code: str, err: str) -> None:
+    """attempts+1 记录月度价格拉取失败（仅网络失败，非数据为空）。"""
+    fd = _load_failed_monthly()
+    prev = fd.get(code, {})
+    fd[code] = {
+        "attempts": int(prev.get("attempts", 0)) + 1,
+        "last_try": _datetime.now().isoformat(timespec="seconds"),
+        "last_error": str(err)[:200],
+    }
+
+
+def clear_monthly_failed(code: str) -> None:
+    """成功拉取后清除失败记录。"""
+    fd = _load_failed_monthly()
+    if code in fd:
+        fd.pop(code, None)
+
+
+def load_monthly_failed_codes(max_attempts: Optional[int] = None) -> list:
+    """返回失败 code 列表（attempts < 死码阈值），供下次启动优先重试。"""
+    fd = _load_failed_monthly()
+    limit = max_attempts if max_attempts is not None else _FAILED_MAX_ATTEMPTS
+    return [c for c, r in fd.items() if int(r.get("attempts", 0)) < limit]
 
 
 # ---------- Cache (永久有效) ----------
