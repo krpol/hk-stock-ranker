@@ -66,7 +66,9 @@ OUT_COLS = ["date", "code", "open", "close", "high", "low", "volume", "amount", 
 
 # B50-r3: 缓存够新阈值。月度更新时，只要日线缓存已含该日期之后的交易日，
 # 就复用缓存，不再重拉（新浪连续请求 ~250 只会挂起连接）。
-FRESH_CUTOFF = pd.Timestamp("2026-08-01")
+# B52: 阈值改为动态（当月 1 号），否则硬编码日期不随月份滚动，会把上月缓存误判为「够新」跳过重拉，
+# 导致月末价长期缺失（本 bug 使 9 月排名一度停留在 9/4 价）。
+FRESH_CUTOFF = pd.Timestamp.now().normalize().replace(day=1)
 
 
 def _resample_monthly(df: pd.DataFrame) -> pd.DataFrame:
