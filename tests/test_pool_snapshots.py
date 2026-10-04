@@ -207,7 +207,7 @@ def test_S_run_backfill_writes_snapshots(tmp_data_dir, monkeypatch):
 
     # A10 批量路径：mock 内部决策函数让全部通过
     monkeypatch.setattr(backfill_pools, "_prefetch_ticker_data",
-                        lambda c, oc, le: (pd.Series(dtype=float), pd.Series(dtype=float)))
+                        lambda c, oc, le, **kw: (pd.Series(dtype=float), pd.Series(dtype=float)))
     monkeypatch.setattr(backfill_pools, "_decide_div_history", lambda divs, dt, **kw: True)
     monkeypatch.setattr(backfill_pools, "_decide_recent_div", lambda divs, dt, **kw: True)
     monkeypatch.setattr(backfill_pools, "_decide_share_dilution",
@@ -231,7 +231,7 @@ def test_S_run_backfill_skip_existing(tmp_data_dir, monkeypatch):
     monkeypatch.setattr(backfill_pools, "get_hk_stock_list", lambda: full)
     # A10 mock 路径
     monkeypatch.setattr(backfill_pools, "_prefetch_ticker_data",
-                        lambda c, oc, le: (pd.Series(dtype=float), pd.Series(dtype=float)))
+                        lambda c, oc, le, **kw: (pd.Series(dtype=float), pd.Series(dtype=float)))
     monkeypatch.setattr(backfill_pools, "_decide_div_history", lambda divs, dt, **kw: True)
     monkeypatch.setattr(backfill_pools, "_decide_recent_div", lambda divs, dt, **kw: True)
     monkeypatch.setattr(backfill_pools, "_decide_share_dilution",
@@ -286,7 +286,7 @@ def test_S7_batched_run_writes_all_pools(tmp_data_dir, monkeypatch):
 
     # 让 00001 在 2022 通过、2023 不通过（fallback 也不通过）
     # 让 00002 全部通过
-    def fake_prefetch(code, oc, le):
+    def fake_prefetch(code, oc, le, **kw):
         return (pd.Series(dtype=float), pd.Series(dtype=float))
 
     def fake_div_hist(divs, dt, **kw):

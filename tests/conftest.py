@@ -6,7 +6,7 @@ pytest 通用 fixture：
 """
 import os
 import sys
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 from unittest.mock import MagicMock
 
@@ -41,6 +41,14 @@ def tmp_data_dir(tmp_path, monkeypatch):
     monkeypatch.setattr(store, "RANKING_CSV", str(csv_dir / "hk_ranking_{period}.csv"))
     monkeypatch.setattr(store, "RANKING_EXCEL", str(excel_dir / "hk_ranking_{period}.xlsx"))
 
+    # collectors.incremental 在模块级把 CSV_DIR 固化进 sidecar 路径，
+    # 只 patch store.CSV_DIR 不生效 —— 测试会读写项目真实 sidecar，
+    # 导致假股票码（00001 等）污染 data/csv 且上一次运行的 failed 记录
+    # 让本次「不应刷新」的断言失效。
+    import collectors.incremental as incremental
+    monkeypatch.setattr(incremental, "FAILED_SIDECAR", str(csv_dir / "hk_financial_failed.json"))
+    monkeypatch.setattr(incremental, "EMPTY_SIDECAR", str(csv_dir / "hk_financial_empty.json"))
+
     return {"csv": csv_dir, "excel": excel_dir, "root": tmp_path}
 
 
@@ -54,8 +62,15 @@ def fake_stock_list():
     ])
 
 
-def _make_fin_record(code: str, fy_div: float = 0.5, current_fy_end: str = "2024-12-31"):
-    """构造一条 collect_financial_data 期望返回的字典"""
+def _make_fin_record(code: str, fy_div: float = 0.5, current_fy_end: str = None):
+    """构造一条 collect_financial_data 期望返回的字典
+
+    current_fy_end 默认取 60 天前（动态）：needs_refresh 在
+    「距财年末 > FORCE_REFRESH_AFTER_FY_DAYS(120)」时会触发 fy_report_due 强刷，
+    写死日期会随时间推移越过该阈值，使 F2/F3/F5/F8 等「不应刷新」的断言失效。
+    """
+    if current_fy_end is None:
+        current_fy_end = (datetime.now() - timedelta(days=60)).strftime("%Y-%m-%d")
     return {
         "code": code,
         "fy_div_per_share": fy_div,
@@ -107,7 +122,13 @@ def mock_collect(monkeypatch):
 
     def fake_collect(code, forward_div_override=None, check_dividend_history=True):
         call_log.append(code)
-        return _make_fin_record(code)
+        rec = _make_fin_record(code)
+        # 真实 collect_financial_data 必带 _status；缺失时 _merge_record_by_status
+        # 会把每个 domain 默认判 fail 而不写入任何字段，结果只剩 code 列。
+        from collectors.hk_financial import ALL_DOMAINS
+        rec["_status"] = {d: "ok" for d in ALL_DOMAINS}
+        rec["_reason"] = {}
+        return rec
 
     # 在 collectors.incremental 模块的命名空间中替换
     import collectors.incremental as inc
