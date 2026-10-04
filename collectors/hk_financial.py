@@ -1074,7 +1074,7 @@ AK_ITEM_MAP: dict = {
     # 现金流量表
     "operating_cashflow": ["经营业务现金净额"],
     "capex": ["购建固定资产", "购建无形资产及其他资产"],  # 两项相加
-    "depreciation_amortization": ["折旧及摊销"],
+    "depreciation_amortization": ["加:折旧及摊销", "折旧及摊销"],
     "lease_repayment": ["偿还融资租赁"],
     # B42: 融资活动利息（若存在则 OCF 未扣利息，real_fcf 需再扣）
     "interest_paid_financing": ["已付利息(融资)"],
