@@ -356,6 +356,40 @@ cases:
     expect:
       fy_div_per_share: { lt: 38.0 }
 
+  # ---------------- B55: 过期的 forward_override 快照致大面积双计 ----------------
+  - issue: B55
+    code: "00316"
+    name: 东方海外国际
+    desc: |
+      【发现】修 B54 后扫双计指纹「fy_div 恰等于 2×forward_div」，命中 62 只。
+      抽查发现多数并非「中期+年度等额派息」的巧合，而是同类双计仍在发生。
+
+      【根因】data/csv/hk_forward_dividend.csv 是**某次抓取的快照**（updated_at
+      为 2026-09-07），245 条里有 208 条的 ex_date 已经过去。
+      forward_div 的语义是「已宣派但未除息」——除息日一过，那笔派息就被 AKShare
+      正常收录为已除息（进 period_done），此时再把它当 override 注入，
+      R4 的 existing_total 比较看不到它（它在别的期的 **done** 里，
+      而 B54 修复后的基准是 done[cur_fy] + 全部 pending）→ 误判缺失 → 重复注入。
+
+      注意这与 B54 是**两个独立缺陷**：B54 修的是 pending 跨期求和，
+      本 case 修的是 override 本身已过期、压根不该参与比较。
+
+      【修复】collectors/hk_forward_dividend.py 的 get_forward_div_map
+      只返回 ex_date > today 的记录（ex_date 缺失也剔除，无法判定是否已除息）。
+      过滤后 245 → 37 条。
+
+      【影响面】53 只 fy_div 虚高，全部下修。典型：
+        82020 3.02→1.51、00316 8.58→7.566、80883 1.88→0.94、06869 2.451915→1.565、
+        01112 1.64→0.98、09980 6.93346→6.320585、02273 2.3→1.84、02877 1.866→1.42
+      修复后双计指纹从 62 只降到 2 只（01525/00855，经核实除息日确在未来、
+      override 与 AKShare 同一笔未重复注入，fy==2×fwd 纯因两期等额派息）。
+
+      00316 真值 7.566 = 4.29（2026-09-10 中期）+ 3.276（2026-05-27 年度）。
+      计算逻辑的确定性覆盖见 tests/test_dividend_attribution.py::
+      test_D11c_forward_div_map_drops_already_ex_dated。
+    expect:
+      fy_div_per_share: { lt: 8.0 }
+
 # ============================================================
 # 全集不变量（不绑定特定 code，对全部股票生效）
 # ============================================================

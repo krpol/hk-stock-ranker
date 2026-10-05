@@ -466,11 +466,24 @@ def load_forward_dividends() -> pd.DataFrame:
     return pd.read_csv(FORWARD_DIV_CSV, dtype={"code": str})
 
 
-def get_forward_div_map() -> dict:
+def get_forward_div_map(today: Optional[pd.Timestamp] = None) -> dict:
     """
-    返回 {code: forward_div_per_share} 字典，供 hk_financial.py 合并使用
+    返回 {code: forward_div_per_share} 字典，供 hk_financial.py 合并使用。
+
+    B55: 只返回**除息日仍在未来**的记录。forward_div 的语义是「已宣派但未除息」，
+    而本 CSV 是某次抓取的快照（可能是数月前），其中大部分条目的 ex_date 早已过去、
+    那笔派息已被 AKShare 正常收录为已除息。若仍当 override 注入，
+    R4 会误判「AKShare 缺这笔」→ 重复注入 → fy_div 双计。
+
+    today: 基准日（默认系统当天），仅供测试注入固定时点。
     """
     df = load_forward_dividends()
+    if df.empty:
+        return {}
+    today = pd.Timestamp(today).normalize() if today is not None \
+        else pd.Timestamp.today().normalize()
+    ex = pd.to_datetime(df.get("ex_date"), errors="coerce")
+    df = df[ex > today]
     if df.empty:
         return {}
     return dict(zip(df["code"].str.zfill(5), df["forward_div_per_share"].fillna(0.0)))

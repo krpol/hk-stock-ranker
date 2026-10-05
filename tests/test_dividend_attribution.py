@@ -518,6 +518,36 @@ def test_D11b_override_already_pending_in_other_period_no_double_count():
     assert out["forward_div_per_share"] == pytest.approx(20.811438, abs=1e-6)
 
 
+def test_D11c_forward_div_map_drops_already_ex_dated(tmp_path, monkeypatch):
+    """
+    B55: get_forward_div_map 必须剔除**除息日已过**的记录。
+
+    hk_forward_dividend.csv 是某次抓取的快照（可能是数月前）。forward_div 的语义是
+    「已宣派但未除息」，快照里 ex_date 已过去的条目，那笔派息早被 AKShare 收录为
+    已除息（period_done），此时再当 override 注入，R4 会误判「AKShare 缺这笔」
+    → 重复注入 → fy_div 双计。
+
+    实测（2026-10-05）：245 条快照中 208 条 ex_date 已过期，
+    导致 53 只股票 fy_div 虚高（如 82020 3.02→1.51、00316 8.58→7.566）。
+    """
+    import pandas as pd
+    from collectors import hk_forward_dividend
+
+    csv = tmp_path / "hk_forward_dividend.csv"
+    pd.DataFrame([
+        {"code": "00001", "forward_div_per_share": 1.5, "ex_date": "2026-09-10"},  # 已除息
+        {"code": "00002", "forward_div_per_share": 2.5, "ex_date": "2026-11-27"},  # 仍在未来
+        {"code": "00003", "forward_div_per_share": 3.5, "ex_date": ""},            # 缺失
+    ]).to_csv(csv, index=False)
+    monkeypatch.setattr(hk_forward_dividend, "FORWARD_DIV_CSV", str(csv))
+
+    m = hk_forward_dividend.get_forward_div_map(today=pd.Timestamp("2026-10-05"))
+
+    assert "00001" not in m, "除息日已过的 override 必须剔除（否则 R4 双计）"
+    assert "00003" not in m, "ex_date 缺失无法判定是否已除息，应剔除"
+    assert m["00002"] == pytest.approx(2.5, abs=1e-6)
+
+
 
 # =====================================================================
 # B5: 中报期闰年漂移 bug
