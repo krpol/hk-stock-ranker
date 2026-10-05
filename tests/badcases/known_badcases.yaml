@@ -26,6 +26,9 @@
 #   contains: ["sub1", ...]   字符串包含全部子串
 #   not_equal_to_field: <other_field>   不等于另一字段值
 #   non_empty: true           非空（非 NaN、非空串）
+#
+# ⚠️ 阈值写科学计数法必须带小数点和符号（1.0e9 会被 PyYAML 解析成**字符串**，
+#    导致比较时 TypeError）。写 1000000000 或 1.0e+9，不要写 1.0e9。
 
 cases:
   # ---------------- B2: 未表决预案虚高 ----------------
@@ -48,31 +51,29 @@ cases:
       fy_anchor=(8,31)，2026-02-28 中报已发但无派息。
       旧实现用 2024 闰年算 interim_md=(2,29)，过滤掉非闰年的 (2,28) 中报期。
       修复：用「月份匹配 + 月末容差 (≥28)」替代严格 (month, day) 相等。
-      B11 更新：2026-03-06 中期 0.07 已正确归到 2026-02-28 中报期，
-      所以 latest_period_div 应是 0.07（不再是 0）。
+
+      【2026-10-05 去时间化】原断言写死 current_fy_end=2025-08-31 /
+      latest_period_end=2026-02-28，财年滚到 FY2026 后必然 FAIL。
+      本 case 的真实守护点是「平年 (2,28) 中报期不被闰年 md 误过滤」——
+      即 fiscal_periods 必须同时含年报期(08-31)与中报期(02-2x)，与具体年份无关。
+      精确的期归属已由 tests/test_dividend_cross_fy_attribution.py 用固定
+      today 做确定性覆盖。
     expect:
-      latest_period_end: { exact: "2026-02-28" }
-      latest_period_div_per_share: { approx: 0.07 }
-      fiscal_periods: { contains: ["2025-08-31", "2025-02-28"] }
-      current_fy_end: { exact: "2025-08-31" }
+      fiscal_periods: { contains: ["-08-31", "-02-2"] }
 
   - issue: B5
     code: "01773"
     name: 天立国际控股
-    desc: 8 月底财年，B5 修复后 latest_period 应识别为中报期 2026-02-28。
+    desc: 8 月底财年，B5 修复后 fiscal_periods 必须含中报期（平年 02-28 不被过滤）。
     expect:
-      latest_period_end: { exact: "2026-02-28" }
-      fiscal_periods: { contains: ["2025-02-28"] }
-      current_fy_end: { exact: "2025-08-31" }
+      fiscal_periods: { contains: ["-08-31", "-02-2"] }
 
   - issue: B5
     code: "01969"
     name: 中国春来
-    desc: 8 月底财年，B5 修复后 latest_period 应识别为中报期 2026-02-28。
+    desc: 8 月底财年，B5 修复后 fiscal_periods 必须含中报期（平年 02-28 不被过滤）。
     expect:
-      latest_period_end: { exact: "2026-02-28" }
-      fiscal_periods: { contains: ["2025-02-28"] }
-      current_fy_end: { exact: "2025-08-31" }
+      fiscal_periods: { contains: ["-08-31", "-02-2"] }
 
   # ---------------- B5 间接验证：12 月底财年 5 月时点正常态 ----------------
   # 这些股票在 B5 修复后字段值发生变化（fiscal_periods 等），用于验证修复后稳态。
@@ -123,9 +124,15 @@ cases:
       末尾缺「元」字，B7 修复前正则 r"相当于...港币\s*([\d.]+)\s*元" 匹配失败，
       导致该笔 0.622 HKD 被 silently 丢弃，prev_year_div 少算（1.457 而非 2.079）。
       修复：4 条 pattern 末尾「元」改为「元?」（可选）。
+
+      【2026-10-05 去时间化】原断言盯 prev_year/fy_div，但 TTM 窗口每半年推进一期，
+      那笔 0.622 会依次滑过 fy → prev → two_years_ago → 滑出，断言必然过期。
+      改为盯**那笔钱当前所在的窗口**：0.622 归 2024-06-30 中报期，
+      与同财年年报 0.8553 合计 1.4773。实测若正则再次漏解析则降为 0.8553 → 触发失败。
+      正则本身的守护已下移到 tests/test_dividend_attribution.py::test_D1_parse_dividend_amount
+      （直接用该条缺「元」字的真实原文做断言，完全不依赖时间）。
     expect:
-      prev_year_div_per_share: { range: [2.0, 2.2] }   # 正确值 2.079，允许小范围浮动
-      fy_div_per_share: { range: [1.5, 2.0] }           # FY2025: 中期 1.043 + 年度 0.624 = 1.667
+      two_years_ago_div_per_share: { range: [1.4, 1.7] }
 
   # ---------------- B9: 单日成交额采样偏差导致冷门股被永久踢出 ----------------
   - issue: B9
@@ -171,16 +178,19 @@ cases:
 
       修复（B11）：R2 重写为按 distribution_type ("中期"/"年度"/"末期"/"特别") + ex_date
       归到距 ex_date 最近的对应期类型（年报期/中报期），不再信任 AKShare fiscal_year。
+
+      【2026-10-05 去时间化】原断言 latest_period_end=2026-02-28 /
+      latest_period_div≈0.07 / fy_div≈0.13 已随财年滚到 FY2026 全部过期
+      （现 latest=2026-08-31，fy_div=0.07 —— 2026-03-06 的 0.07 仍在 TTM 内，
+      而 2025-08-01 的 0.06 已滑出，归属正确）。
+      本 case 的真实守护点是「中期派息不被错归到年报期」。该语义已由
+      tests/test_dividend_cross_fy_attribution.py::test_b11_01890_full_scenario
+      用固定 today=2026-05-24 + 完整 4 笔派息做确定性覆盖。
+      此处只保留与时间无关的结构性守护：中报期必须被识别出来（不被闰年 md 过滤），
+      且 latest_period_end 非空。
     expect:
-      latest_period_end: { exact: "2026-02-28" }
-      latest_period_div_per_share: { approx: 0.07 }
-      latest_period_yoy_div_per_share: { approx: 0.07 }
-      # 原断言 forward_div_per_share ≈ 0.06 是**时间敏感**的，已失效：
-      # 那笔 0.06 的除净日是 2026-07-31，过期后不再是"预"分红，
-      # 会被采集逻辑正确剔除并转入 TTM。2026-08-02 起该断言必然 FAIL。
-      # 改为守护「这笔钱不丢失」——fy_div 应含 0.07(中期) + 0.06(年度) = 0.13。
-      # 教训：badcase 断言应避免依赖"当前时间与某个除净日的相对位置"。
-      fy_div_per_share: { approx: 0.13 }
+      latest_period_end: { non_empty: true }
+      fiscal_periods: { contains: ["-08-31", "-02-2"] }
 
   # ---------------- B50: 跨年财年 fiscal_year 映射错位（B39-r8 回归） ----------------
   - issue: B50
@@ -277,9 +287,74 @@ cases:
 
       本 case 与上方 B7-02602 共用同一只股票但守护不同环节：
       B7 守护「分红方案正则解析」，本 case 守护「归属窗口宽度」。
+
+      【2026-10-05 去时间化】原断言 prev_year ∈ [2.0,2.2] / two_years_ago ∈ [1.4,1.7]
+      随 TTM 窗口推进而过期（现 prev_year=2.5，含 2024-10-02 特别分配 0.509，归属正确）。
+      改为只守护该 bug 的**直接指纹**：2024-01-02 的中期 0.3461 必须归到 2023-06-30，
+      绝不能被 -180 过宽下界错归到 2024-06-30。
+      实测：正常 two_years_ago=1.4773；若 0.3461 错归则升到 1.8234 → 越界触发失败。
+      窗口下界本身的确定性覆盖见 tests/test_dividend_cross_fy_attribution.py。
     expect:
-      prev_year_div_per_share: { range: [2.0, 2.2] }
       two_years_ago_div_per_share: { range: [1.4, 1.7] }
+
+  # ---------------- B53: D&A 双源币种不一致（科目名精确匹配失败） ----------------
+  - issue: B53
+    code: "01245"
+    name: NIRAKU
+    desc: |
+      【根因】AK_ITEM_MAP["depreciation_amortization"] 映射的科目名是「折旧及摊销」，
+      而 AKShare/东财现金流量表真实科目名为「加:折旧及摊销」。AK_ITEM_MAP 走**精确等值匹配**
+      → MISS → 回退 yfinance。而 yfinance 返回**公司披露货币**（NIRAKU 为日元），
+      AKShare 返回港币，同一函数内两个币种混用 → D&A 被放大约 20 倍（JPY/HKD）。
+
+      【影响】仅 3 个字段：dep_amortization_3y_avg、da_ttm、prev_da。
+      它们只用于 min(capex + lease, D&A) 封顶，D&A 虚高 → 上限恒失效 → real_fcf 被低估。
+      实测 01245：dep_amortization_3y_avg 41.86 亿 JPY → 1.93 亿 HKD，
+      real_fcf_ttm 177 万 → 2827 万，coverage_ratio 0.286 → 0.839，fcf_rating WARN → OK。
+
+      【修复】collectors/hk_financial.py 的映射改为候选列表
+      ["加:折旧及摊销", "折旧及摊销"]（取东财官方港币值，不走自算汇率）。
+      已核对全部 15 个映射，仅 D&A 一处 MISS。
+
+      【守护思路】币种串台的指纹是数量级跳变（日元对港币约 20x）。
+      修复后 dep_amortization_3y_avg = 1.93 亿、da_ttm = 1.89 亿（HKD）；
+      若回退 yfinance 取日元值会跳到 41.86 亿 / 40 亿量级，被 10 亿上限拦住。
+      教训：AK_ITEM_MAP 是精确等值匹配，新增科目前必须打印
+      set(df['STD_ITEM_NAME']) 核对真实科目名，不能凭常识猜。
+    expect:
+      dep_amortization_3y_avg: { lt: 1000000000 }
+      da_ttm: { lt: 1000000000 }
+
+  # ---------------- B54: forward_override 去重基准漏看其他期的 pending ----------------
+  - issue: B54
+    code: "06181"
+    name: 太古
+    desc: |
+      【发现】B2 全集不变量报 06181 的 fy_div_per_share = 41.622876 > 阈值 30。
+      核对东财原始派息：2026-11-27 中期 20.811438 + 2026-05-12 年度 13.65
+      = 34.461438 才是真值，41.622876 恰好多出 20.811438 —— 同一笔被计了两次。
+
+      【根因】engine/dividend_attribution.py 的 R4 规则用
+      existing_total = period_done[current_fy_year_end] + period_pending[current_fy_year_end]
+      作为「AKShare 是否已收录 override 这笔」的判据，**只看了当前财年期**。
+      但 override 的语义是「已宣派未除息」，AKShare 可能把它归到别的期：
+        06181: 2026-11-27 的中期派息归到 2026-06-30 中报期（pending），
+               而 current_fy_year_end = 2025-12-31，该期 pending = 0
+        → 误判「AKShare 缺这笔」→ 再注入 20.811438 到 pending → fy_div 虚高一倍派息额
+
+      【修复】existing_total 的 pending 部分改为跨全部期求和：
+        existing_total = period_done[current_fy_year_end] + sum(period_pending.values())
+
+      【影响面】全池 245 只有非零 forward_override 的股票中，9 只 fy_div 虚高，全部下修：
+        06181 41.622876→34.461438、02885 0.258→0.204、06919 0.28→0.24、
+        01093 0.36→0.33、01066 0.197258→0.167429、00842 0.036→0.018、
+        00998 0.46924→0.455369、03658 0.192→0.18457、01345 0.112→0.11
+
+      计算逻辑的确定性覆盖见 tests/test_dividend_attribution.py::
+      test_D11b_override_already_pending_in_other_period_no_double_count。
+      本 case 守护落盘值不再回到双计态：真值 34.461438，双计态为 41.622876。
+    expect:
+      fy_div_per_share: { lt: 38.0 }
 
 # ============================================================
 # 全集不变量（不绑定特定 code，对全部股票生效）
@@ -290,7 +365,18 @@ global_invariants:
     desc: |
       forward_div_per_share 必须 ≤ fy_div_per_share。
       因 fy_div 已包含 forward 部分，相加会双计（B4 修复内容）。
+
+      【2026-10-05】该不变量在**跨财年边界**不是硬约束，允许少量豁免：
+      fy_div 走 TTM 窗口（past_periods，p ≤ today），而 forward_div 还含
+      「未来财报期的 pending」，两者口径不同。当某只股宣派了归属**下一财年**
+      的派息（典型为除息日在未来的特别分配）时，这笔钱进 forward 但不进 TTM，
+      forward > fy 是正确行为，不是双计。
+      实例（2026-10-05）：01205 ex=2026-10-14 特别 0.081（fy_div=0）、
+                          06186 ex=2026-10-13 特别 0.2905（fy_div=0.2118）。
+      改为比例阈值：双计 bug 是系统性的（会命中成百只），而跨财年边界只影响个别股。
+      超过 2% 即视为 bug 复现。
     tolerance: 1.0e-6
+    max_violation_ratio: 0.02
 
   - issue: B3
     rule: total_liability_ratio_coverage
@@ -302,8 +388,15 @@ global_invariants:
   - issue: B2
     rule: no_outlier_dividend
     desc: |
-      防御性兜底：没有任何股票的 fy_div_per_share / forward_div_per_share 超过 30.0 港元。
+      防御性兜底：没有任何股票的 fy_div_per_share / forward_div_per_share 超过阈值。
       避免类似 02355 5.5 港元未表决预案、或解析错误（如把 RMB 当 HKD）的极端异常。
-      港股最高年度派息约 25 港元/股（如 06181 太古），阈值 30 留有余量。
-      若未来有合规公司确实超过此值，需逐一审查后调整阈值。
-    threshold: 30.0
+
+      【2026-10-05 阈值上调 30 → 45，按本文件既有约定「逐一审查后调整」】
+      06181 太古 FY2026 TTM = 20.811438（2026-11-27 中期）+ 13.65（2026-05-12 年度）
+      = 34.461438，逐笔核对东财原始记录，RMB→HKD 换算正确，属真实高价股派息。
+      同期第二名 00945 为 16.28，与 06181 之间有明显断档，45 对两者都留足余量。
+      注：此前 06181 曾因 R4 override 双计虚高到 41.62（B54 已修），
+      那类 bug 由 tests/test_dividend_attribution.py::
+      test_D11b_override_already_pending_in_other_period_no_double_count 精确守护，
+      不再依赖本阈值兜底。
+    threshold: 45.0

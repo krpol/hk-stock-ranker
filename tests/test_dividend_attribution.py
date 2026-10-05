@@ -13,6 +13,8 @@ from collectors.hk_dividend_history import parse_dividend_amount_hkd
     # 多币种：优先抓「相当于港币」
     ("每股派美元0.45元(相当于港币3.522942元)", 3.522942),
     ("每股派美元0.13125元(相当于港币1.027545元(计算值))", 1.027545),
+    # B7: 原文末尾缺「元」字（02602 万物云 2024 中期），旧正则匹配失败致 silently 丢弃
+    ("每股派人民币0.562元(相当于港币0.622)", 0.622),
     # 特别分红（实物派息换算）
     ("特殊说明:每10股分派1股美团B类普通股股份(相当于每股派18.13港元)", 18.13),
     # 备用语法 "每股派 X.X 港元"
@@ -92,7 +94,8 @@ def test_D2_fy_attribution_mocked(monkeypatch):
             return FI()
     monkeypatch.setattr(hk_financial, "_get_ticker", lambda code: FakeTicker())
 
-    r = hk_financial.get_fiscal_year_dividends("09616", forward_div_override=None)
+    r = hk_financial.get_fiscal_year_dividends("09616", forward_div_override=None,
+                                               today=pd.Timestamp("2026-05-23"))
 
     assert r["current_fy_end"] == "2025-12-31"
     assert r["prev_fy_end"] == "2024-12-31"
@@ -125,7 +128,9 @@ def test_D3_fallback_to_yfinance_heuristic(monkeypatch):
         lambda code, **kw: [],
     )
 
-    fake_periods = [pd.Timestamp(2025, 12, 31), pd.Timestamp(2024, 12, 31)]
+    # 年报 + 中报锚点（TTM 窗口 = 最新两期，需中报期才能区分 fy / prev_fy）
+    fake_periods = [pd.Timestamp("2025-12-31"), pd.Timestamp("2025-06-30"),
+                    pd.Timestamp("2024-12-31"), pd.Timestamp("2024-06-30")]
     monkeypatch.setattr(
         hk_financial, "_get_fiscal_period_ends",
         lambda code: (fake_periods, (12, 31)),
@@ -146,7 +151,8 @@ def test_D3_fallback_to_yfinance_heuristic(monkeypatch):
             return FI()
     monkeypatch.setattr(hk_financial, "_get_ticker", lambda code: FakeTicker())
 
-    r = hk_financial.get_fiscal_year_dividends("test", forward_div_override=None)
+    r = hk_financial.get_fiscal_year_dividends("test", forward_div_override=None,
+                                               today=pd.Timestamp("2026-05-23"))
     # 启发式将 0.5 归到 prev_fy（2024-12-31）
     assert r["prev_year_div_per_share"] == pytest.approx(0.5, abs=1e-6)
     assert r["fy_div_per_share"] == pytest.approx(0.0, abs=1e-6)
@@ -212,7 +218,8 @@ def test_D4_skip_unscheduled_special_dividend(monkeypatch):
             return FI()
     monkeypatch.setattr(hk_financial, "_get_ticker", lambda code: FakeTicker())
 
-    r = hk_financial.get_fiscal_year_dividends("02355", forward_div_override=None)
+    r = hk_financial.get_fiscal_year_dividends("02355", forward_div_override=None,
+                                               today=pd.Timestamp("2026-05-23"))
 
     # 关键断言：5.5 港元的特别分配（未表决预案）必须不计入
     assert r["fy_div_per_share"] != pytest.approx(5.596, abs=1e-3), \
@@ -250,7 +257,7 @@ def test_D7_forward_override_no_double_count(monkeypatch):
     from scripts.refresh_dividend_only import recompute_dividends_for_code
     from collectors import hk_dividend_history
 
-    today = pd.Timestamp.today().normalize()
+    today = pd.Timestamp("2026-05-23")
     fake_records = [
         {"ex_date": pd.Timestamp("2025-09-05"), "fiscal_year": 2025,
          "amount_hkd": 0.08, "distribution_type": "中期分配", "raw_scheme": "每股派港币0.08元"},
@@ -279,7 +286,7 @@ def test_D7_forward_override_no_double_count(monkeypatch):
     })
 
     # 关键：传入 forward_override = 0.12（与年度派息金额相同）
-    out = recompute_dividends_for_code("00255", row, forward_override=0.12)
+    out = recompute_dividends_for_code("00255", row, forward_override=0.12, today=today)
 
     assert out["fy_div_per_share"] == pytest.approx(0.20, abs=1e-3), \
         f"fy_div 应该 = 0.20，但 = {out['fy_div_per_share']}（疑似双计）"
@@ -468,6 +475,47 @@ def test_D11_compute_dividend_fields_override_fill_when_missing():
     assert out["forward_div_per_share"] == pytest.approx(0.20, abs=1e-6)
     # prev_fy = 2023-12-31，无派息
     assert out["prev_year_div_per_share"] == pytest.approx(0.0, abs=1e-6)
+
+
+def test_D11b_override_already_pending_in_other_period_no_double_count():
+    """
+    B54: R4 的 override 去重基准必须覆盖**全部期**的 pending，不能只看当前财年期。
+
+    真实场景（06181 太古，2026-10-05）：
+        2026-11-27 中期 20.811438（未除息）→ AKShare 已收录，归到 2026-06-30 中报期
+        HKEX/东财 forward_override = 20.811438  ← 同一笔
+        current_fy_year_end = 2025-12-31（该期无 pending）
+
+    旧实现只比 current_fy_year_end 的 done+pending，看不见 2026-06-30 上的 pending
+    → 误判「AKShare 缺这笔」→ 再注入一次 → fy_div 从 34.46 虚高到 41.62（恰好多 20.81）。
+    """
+    from engine.dividend_attribution import DividendRecord, compute_dividend_fields
+
+    today = pd.Timestamp("2026-10-05")
+    records = [
+        DividendRecord(ex_date=pd.Timestamp("2026-11-27"), amount_hkd=20.811438,
+                       fiscal_year=2026, distribution_type="中期分配", source="akshare"),
+        DividendRecord(ex_date=pd.Timestamp("2026-05-12"), amount_hkd=13.65,
+                       fiscal_year=2025, distribution_type="年度分配", source="akshare"),
+        DividendRecord(ex_date=pd.Timestamp("2025-11-20"), amount_hkd=10.52,
+                       fiscal_year=2025, distribution_type="中期分配", source="akshare"),
+        DividendRecord(ex_date=pd.Timestamp("2025-05-22"), amount_hkd=6.88,
+                       fiscal_year=2024, distribution_type="年度分配", source="akshare"),
+    ]
+    periods = [pd.Timestamp(s) for s in (
+        "2026-12-31", "2026-06-30", "2025-12-31", "2025-06-30",
+        "2024-12-31", "2024-06-30",
+    )]
+
+    baseline = compute_dividend_fields(records, periods, fy_anchor=(12, 31), today=today)
+    out = compute_dividend_fields(records, periods, fy_anchor=(12, 31), today=today,
+                                   forward_override=20.811438)
+
+    # override 指向 AKShare 已收录的那笔 → fy_div 不得变化
+    assert out["fy_div_per_share"] == pytest.approx(baseline["fy_div_per_share"], abs=1e-6), \
+        f"override 重复注入导致 fy_div 虚高：{baseline['fy_div_per_share']} → {out['fy_div_per_share']}"
+    assert out["fy_div_per_share"] == pytest.approx(34.461438, abs=1e-6)
+    assert out["forward_div_per_share"] == pytest.approx(20.811438, abs=1e-6)
 
 
 

@@ -600,7 +600,8 @@ def _get_fiscal_period_ends(code: str):
         return [], None
 
 
-def get_fiscal_year_dividends(code: str, forward_div_override: Optional[float] = None) -> dict:
+def get_fiscal_year_dividends(code: str, forward_div_override: Optional[float] = None,
+                              today: Optional[pd.Timestamp] = None) -> dict:
     """
     获取最近 1 年内已披露的财报对应的分红 + 预分红（按真实财报截止日精确归属）。
 
@@ -612,6 +613,7 @@ def get_fiscal_year_dividends(code: str, forward_div_override: Optional[float] =
     Args:
         code: 港股代码
         forward_div_override: HKEX 爬虫得到的预告分红（更准确）。
+        today: 基准日（默认系统当天），仅供测试注入固定时点。
 
     Returns:
         见 compute_dividend_fields 返回值。失败返回 EMPTY。
@@ -635,7 +637,8 @@ def get_fiscal_year_dividends(code: str, forward_div_override: Optional[float] =
 
     try:
         t = _get_ticker(code)
-        today = pd.Timestamp(datetime.now().date())
+        today = pd.Timestamp(today).normalize() if today is not None \
+            else pd.Timestamp(datetime.now().date())
 
         # ---- Step 1: 拿到所有财报截止日 + 年报锚点 ----
         periods, fy_anchor = _get_fiscal_period_ends(code)

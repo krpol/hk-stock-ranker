@@ -95,15 +95,19 @@ def _build_periods_from_records(records, fy_anchor, today, current_fy_year_end):
 
 
 def recompute_dividends_for_code(code: str, row: pd.Series,
-                                   forward_override: float = None) -> dict:
+                                   forward_override: float = None,
+                                   today: pd.Timestamp = None) -> dict:
     """
     从 AKShare 派息表 + CSV 中已有的 fy 锚点重新计算分红字段。
 
     【C1 重构】内部委托给 engine.dividend_attribution.compute_dividend_fields。
 
+    today: 基准日（默认系统当天），仅供测试注入固定时点。
+
     Returns: dict 包含要更新的列；空 dict 表示跳过（无数据）。
     """
-    today = pd.Timestamp.today().normalize()
+    today = pd.Timestamp(today).normalize() if today is not None \
+        else pd.Timestamp.today().normalize()
     fy_anchor = get_fy_anchor_for_code(row)
 
     raw_records = get_hk_dividends_with_fy_attribution(code)

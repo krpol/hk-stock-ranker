@@ -462,9 +462,14 @@ def compute_dividend_fields(
     forward_div = forward_from_curr_fy + forward_from_future
 
     # ---- R4: forward_override 注入（B4 修复）----
-    # 比较 override 与「当前财年总额（done+pending）」：
+    # 比较 override 与「当前财年已除息 + 全部未除息（pending）」：
     # - override > existing_total → AKShare 缺这笔，补差到 pending
     # - override <= existing_total → AKShare 已收录，不重复注入
+    #
+    # B54: pending 要跨全部期求和，不能只看 current_fy_year_end。
+    # override 语义是「已宣派未除息」，AKShare 可能把它归到别的期
+    # （如 06181 中期派息归到 2026-06-30，而 current_fy_year_end 是 2025-12-31），
+    # 只比当前财年期会误判为「AKShare 缺这笔」→ 再注入一次 → fy_div 双计。
     if (
         forward_override is not None
         and forward_override > 0
@@ -473,7 +478,7 @@ def compute_dividend_fields(
         override_amt = float(forward_override)
         existing_done = period_done.get(current_fy_year_end, 0.0)
         existing_pending = period_pending.get(current_fy_year_end, 0.0)
-        existing_total = existing_done + existing_pending
+        existing_total = existing_done + sum(period_pending.values())
         if override_amt > existing_total:
             delta = override_amt - existing_total
             period_pending[current_fy_year_end] = existing_pending + delta

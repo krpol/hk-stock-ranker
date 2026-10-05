@@ -191,13 +191,15 @@ def test_global_invariant(inv, fin_df):
 
     if rule == "forward_le_fy":
         tol = float(inv.get("tolerance", 1e-6))
+        max_ratio = float(inv.get("max_violation_ratio", 0.0))
         fwd = fin_df["forward_div_per_share"].fillna(0)
         fy = fin_df["fy_div_per_share"].fillna(0)
         bad = fin_df[fwd > fy + tol]
-        if not bad.empty:
+        if len(bad) > max_ratio * len(fin_df):
             sample = bad[["code", "fy_div_per_share", "forward_div_per_share"]].head(5).to_string(index=False)
             pytest.fail(
-                f"forward > fy at {len(bad)} rows (B4 双计 bug 复现):\n{sample}"
+                f"forward > fy at {len(bad)}/{len(fin_df)} rows "
+                f"(> {max_ratio:.1%} 豁免额度，B4 双计 bug 复现):\n{sample}"
             )
 
     elif rule == "total_liability_ratio_coverage":

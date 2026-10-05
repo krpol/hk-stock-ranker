@@ -19,6 +19,7 @@ logs/
 .DS_Store
 .vscode/
 .idea/
+.myflicker/
 
 # Tempfiles
 *.tmp
