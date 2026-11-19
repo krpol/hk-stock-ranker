@@ -32,7 +32,8 @@ class TestCodeToYfTicker:
         assert _code_to_yf_ticker("01245") == "1245.HK"
 
     def test_single_zero(self):
-        assert _code_to_yf_ticker("00001") == "1.HK"
+        # yfinance 港股 ticker 需至少 4 位数字：00001 → 0001.HK（旧实现误输出 1.HK 会被 404）
+        assert _code_to_yf_ticker("00001") == "0001.HK"
 
     def test_five_digit(self):
         assert _code_to_yf_ticker("09988") == "9988.HK"

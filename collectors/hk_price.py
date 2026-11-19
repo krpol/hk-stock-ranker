@@ -164,6 +164,59 @@ def get_hk_stock_list(max_retries: int = 5) -> pd.DataFrame:
     return df
 
 
+def _fetch_yf_monthly(code: str, start_date: str, end_date: str) -> pd.DataFrame:
+    """
+    用 yfinance 拉单只港股月线，一次请求同时拿到不复权价 + 复权价（Adj Close）。
+
+    返回列: date, code, open, close, high, low, volume, amount, close_qfq
+        close      —— 原始（不复权）收盘价，用于 PE/PB/股息率/ranking 展示价
+        close_qfq  —— 复权收盘价（Adj Close，股息+拆股全复权），用于动量/价格变化率/回测
+        amount     —— close × volume 近似成交额（港元）
+
+    date 统一为月末（MonthEnd），与既有东财历史数据口径对齐，避免同月两条记录。
+    """
+    import yfinance as yf
+    code = str(code).zfill(5)
+    ticker = _code_to_yf_ticker(code)
+    start = pd.to_datetime(start_date).strftime("%Y-%m-%d")
+    end = pd.to_datetime(end_date).strftime("%Y-%m-%d")
+
+    for attempt in range(1, 4):
+        try:
+            hist = yf.Ticker(ticker).history(
+                start=start, end=end, interval="1mo", auto_adjust=False,
+            )
+            if hist is None or hist.empty:
+                return pd.DataFrame()
+            hist = hist.copy()
+            hist.index = hist.index + pd.offsets.MonthEnd(0)  # 月初 → 月末
+            df = pd.DataFrame({
+                "date": hist.index.strftime("%Y-%m-%d"),
+                "code": code,
+                "open": hist["Open"].astype(float),
+                "close": hist["Close"].astype(float),
+                "high": hist["High"].astype(float),
+                "low": hist["Low"].astype(float),
+                "volume": hist["Volume"].astype(float).fillna(0),
+                "amount": (hist["Close"] * hist["Volume"]).astype(float).fillna(0),
+                "close_qfq": hist["Adj Close"].astype(float),
+            })
+            df = df.dropna(subset=["close"]).reset_index(drop=True)
+            return df[["date", "code", "open", "close", "high", "low", "volume", "amount", "close_qfq"]]
+        except Exception as e:
+            if _is_rate_limited(e):
+                _rate_limit_backoff()
+                return pd.DataFrame()
+            if attempt < 3:
+                time.sleep(2 * attempt)
+            else:
+                logger.warning(f"[{code}] yfinance 月线拉取失败: {str(e)[:80]}")
+
+    logger.warning(f"[{code}] yfinance 月线达最大重试次数")
+    mark_monthly_failed(code, "monthly price max retries")   # B51: 网络失败记录，下次启动优先重试
+    return pd.DataFrame()
+
+
 def get_hk_monthly_price(
     code: str,
     start_date: str,
@@ -172,61 +225,23 @@ def get_hk_monthly_price(
     max_retries: int = 3,
 ) -> pd.DataFrame:
     """
-    获取港股月度收盘价（复权），带重试
-    
-    Args:
-        code: 港股代码（5位，如 "00700"）
-        start_date: 开始日期 "YYYYMMDD"
-        end_date: 结束日期 "YYYYMMDD"
-        adjust: 复权方式 "hfq"=后复权 / "qfq"=前复权 / ""=不复权
-    
+    获取港股月度收盘价（复权）。数据源：yfinance（走统一出口代理）。
+
+    adjust:
+        ""        —— 不复权（原始收盘价）
+        "qfq"/"hfq" —— 复权价（Adj Close，股息+拆股全复权），用于动量/回测
+
     Returns:
-        DataFrame with columns: date, open, close, high, low, volume, amount
+        DataFrame with columns: date, code, open, close, high, low, volume, amount
     """
     code = str(code).zfill(5)   # B51: 统一 5 位，保证 failed sidecar key 一致
-    for attempt in range(1, max_retries + 1):
-        try:
-            df = ak.stock_hk_hist_em(
-                symbol=code,
-                period="monthly",
-                start_date=start_date,
-                end_date=end_date,
-                adjust=adjust,
-            )
-            df = df.rename(columns={
-                "日期": "date",
-                "开盘": "open",
-                "收盘": "close",
-                "最高": "high",
-                "最低": "low",
-                "成交量": "volume",
-                "成交额": "amount",
-                "涨跌幅": "pct_change",
-                "涨跌额": "change",
-            })
-            df["date"] = pd.to_datetime(df["date"])
-            df["code"] = code
-            time.sleep(AKSHARE_SLEEP)
-            clear_monthly_failed(code)   # B51: 成功拉取，清除失败记录
-            return df[["date", "code", "open", "close", "high", "low", "volume", "amount"]]
-        except Exception as e:
-            if _is_rate_limited(e):
-                _rate_limit_backoff()
-                return pd.DataFrame()
-            err_str = str(e)
-            if any(kw in err_str for kw in ("Connection aborted", "RemoteDisconnected",
-                                             "Connection refused", "timed out",
-                                             "curl: (6)", "curl: (7)", "curl: (28)")):
-                wait = 5 + 3 * attempt
-                logger.warning(f"[{code}] 月度价格网络异常，{wait}s后重试({attempt}/{max_retries}): {err_str[:60]}")
-                time.sleep(wait)
-            else:
-                logger.warning(f"[{code}] 获取月度价格失败(非网络): {err_str[:80]}")
-                return pd.DataFrame()
-    
-    logger.warning(f"[{code}] 月度价格达最大重试次数")
-    mark_monthly_failed(code, "monthly price max retries")   # B51: 网络失败记录，下次启动优先重试
-    return pd.DataFrame()
+    df = _fetch_yf_monthly(code, start_date, end_date)
+    if df.empty:
+        return pd.DataFrame()
+    if adjust in ("qfq", "hfq"):
+        df = df.assign(close=df["close_qfq"])
+    clear_monthly_failed(code)   # B51: 成功拉取，清除失败记录
+    return df[["date", "code", "open", "close", "high", "low", "volume", "amount"]]
 
 
 def get_hk_monthly_price_dual(
@@ -236,42 +251,27 @@ def get_hk_monthly_price_dual(
     max_retries: int = 3,
 ) -> pd.DataFrame:
     """
-    获取港股月度价格的【原始价 + 前复权价】双价版本。
+    获取港股月度价格的【原始价 + 复权价】双价版本。数据源：yfinance（一次请求）。
 
     返回列: date, code, open, close, high, low, volume, amount, close_qfq
         close      —— 原始（不复权）收盘价，用于 PE/PB/股息率/ranking 展示价
-        close_qfq  —— 前复权收盘价，用于动量/价格变化率/回测
+        close_qfq  —— 复权收盘价（Adj Close），用于动量/价格变化率/回测
         OHL/V/amount 维持不复权口径
-
-    实现：对 akshare 调两次，分别 adjust="" 与 adjust="qfq"，按 date 对齐 merge。
-    任一侧空则返回空 DataFrame。
     """
-    raw = get_hk_monthly_price(code, start_date, end_date, adjust="", max_retries=max_retries)
-    if raw.empty:
-        return pd.DataFrame()
-    qfq = get_hk_monthly_price(code, start_date, end_date, adjust="qfq", max_retries=max_retries)
-    if qfq.empty:
-        logger.warning(f"[{code}] qfq 拉取为空，dual 返回空")
-        return pd.DataFrame()
-    # 仅取 qfq 的 close 列重命名 close_qfq，按 (date, code) join
-    qfq_slim = qfq[["date", "code", "close"]].rename(columns={"close": "close_qfq"})
-    merged = raw.merge(qfq_slim, on=["date", "code"], how="left")
-    return merged[["date", "code", "open", "close", "high", "low", "volume", "amount", "close_qfq"]]
+    code = str(code).zfill(5)
+    return _fetch_yf_monthly(code, start_date, end_date)
 
 
 def get_hk_current_price(code: str) -> Optional[float]:
-    """获取港股当前（最新）收盘价（不复权）"""
+    """获取港股当前（最新）收盘价（不复权），数据源：yfinance。"""
+    import yfinance as yf
+    code = str(code).zfill(5)
     try:
-        df = ak.stock_hk_hist_em(
-            symbol=code,
-            period="daily",
-            start_date="20200101",
-            end_date=pd.Timestamp.today().strftime("%Y%m%d"),
-            adjust="",
-        )
-        if df.empty:
+        hist = yf.Ticker(_code_to_yf_ticker(code)).history(period="5d", auto_adjust=False)
+        if hist is None or hist.empty:
             return None
-        return float(df.iloc[-1]["收盘"])
+        close = float(hist["Close"].dropna().iloc[-1])
+        return close if close > 0 else None
     except Exception as e:
         if _is_rate_limited(e):
             _rate_limit_backoff()
@@ -315,8 +315,9 @@ def get_hk_pe_pb(code: str) -> dict:
 
 
 def _code_to_yf_ticker(code: str) -> str:
-    """5 位港股代码 → yfinance ticker：去前导零 + .HK，例如 '01245' → '1245.HK'"""
-    return f"{int(code)}.HK"
+    """5 位港股代码 → yfinance ticker：去前导零、左补零到至少 4 位 + .HK。
+    例如 '01245' → '1245.HK'，'00700' → '0700.HK'，'00005' → '0005.HK'。"""
+    return f"{int(code):04d}.HK"
 
 
 def _fetch_single_max_amount(code: str, lookback_days: int) -> tuple[str, float]:
