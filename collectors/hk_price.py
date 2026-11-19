@@ -13,6 +13,25 @@ from config.settings import AKSHARE_SLEEP
 
 logger = logging.getLogger(__name__)
 
+# 东财限流识别（akshare 抛出的限流异常文本）
+_RATE_LIMIT_KEYWORDS = ("限流", "RateLimit", "Too Many Requests", "push2 行情服务器断开", "断开了连接")
+_last_rate_limit_wait = 0.0
+
+
+def _is_rate_limited(e: Exception) -> bool:
+    return any(k in str(e) for k in _RATE_LIMIT_KEYWORDS)
+
+
+def _rate_limit_backoff(seconds: float = 60.0) -> None:
+    """触发东财限流时做一次全局退避（30s 去重，避免并发下多 worker 重复等待）。"""
+    global _last_rate_limit_wait
+    now = time.time()
+    if now - _last_rate_limit_wait < 30:
+        return
+    _last_rate_limit_wait = now
+    logger.warning(f"检测到东财限流，全局退避 {seconds:.0f}s（等待期间勿重复请求）...")
+    time.sleep(seconds)
+
 # 东方财富港股行情接口（直接请求，绕开 AKShare Session 问题）
 _EM_HK_URL = "https://72.push2.eastmoney.com/api/qt/clist/get"
 _EM_HK_PARAMS_BASE = {
@@ -191,6 +210,9 @@ def get_hk_monthly_price(
             clear_monthly_failed(code)   # B51: 成功拉取，清除失败记录
             return df[["date", "code", "open", "close", "high", "low", "volume", "amount"]]
         except Exception as e:
+            if _is_rate_limited(e):
+                _rate_limit_backoff()
+                return pd.DataFrame()
             err_str = str(e)
             if any(kw in err_str for kw in ("Connection aborted", "RemoteDisconnected",
                                              "Connection refused", "timed out",
@@ -251,7 +273,10 @@ def get_hk_current_price(code: str) -> Optional[float]:
             return None
         return float(df.iloc[-1]["收盘"])
     except Exception as e:
-        logger.warning(f"[{code}] 获取当前价格失败: {e}")
+        if _is_rate_limited(e):
+            _rate_limit_backoff()
+        else:
+            logger.warning(f"[{code}] 获取当前价格失败: {e}")
         return None
 
 

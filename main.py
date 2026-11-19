@@ -443,20 +443,34 @@ def run_update(force_refresh: bool = False, refresh_codes: list = None,
         if retry_codes:
             logger.info(f"  本次将重试 {len(retry_codes)} 只上次月度价格拉取失败的股票")
 
-        for i, (_, row) in enumerate(stock_list.iterrows()):
-            code = str(row["code"]).zfill(5)
-            if (i + 1) % 50 == 0 or i == 0:
-                logger.info(f"  [{i+1}/{len(stock_list)}] {code} {row.get('name', '')}")
-            df = get_hk_monthly_price_dual(code, start_date, end_date)
-            if not df.empty:
-                all_price_dfs.append(df)
+        # B53: 月度价格并发采集（受控并发，配合限流退避）
+        from concurrent.futures import ThreadPoolExecutor, as_completed
+        price_codes = stock_list["code"].astype(str).str.zfill(5).tolist()
+        price_workers = max(2, min(workers, 5))
+
+        def _fetch_price(code):
+            try:
+                return code, get_hk_monthly_price_dual(code, start_date, end_date)
+            except Exception as e:
+                logger.warning(f"价格采集异常 {code}: {e}")
+                return code, pd.DataFrame()
+
+        with ThreadPoolExecutor(max_workers=price_workers) as exe:
+            futs = {exe.submit(_fetch_price, c): c for c in price_codes}
+            done = 0
+            for fut in as_completed(futs):
+                code, df = fut.result()
+                if not df.empty:
+                    all_price_dfs.append(df)
+                done += 1
+                if done % 50 == 0 or done == len(price_codes):
+                    logger.info(f"  [{done}/{len(price_codes)}]")
 
         if all_price_dfs:
             combined_price = pd.concat(all_price_dfs, ignore_index=True)
             save_monthly_price(combined_price)
 
         save_monthly_failed()   # B51: 持久化本月失败记录，供下次启动自动重试
-
     # ---- Step 2b: [B13] 新入池/价格不足股票 5 年回填 ----
     # 触发条件：池内 code 在 hk_monthly_price.csv 中的月数 < HISTORY_YEARS*12*0.8
     # （容忍 20% 缺失/停牌；新股、长期停牌均会触发）
@@ -530,18 +544,31 @@ def run_update(force_refresh: bool = False, refresh_codes: list = None,
     logger.info("  采集当前价格...")
     latest_close = load_latest_close_map()
     current_price_map = {}
-    for i, (_, row) in enumerate(stock_list.iterrows()):
-        code = str(row["code"]).zfill(5)
+    codes_zf = stock_list["code"].astype(str).str.zfill(5).tolist()
+
+    # B53: current_price 并发采集（受控并发 + 失败回退月度价缓存），替代原串行 902 只
+    from concurrent.futures import ThreadPoolExecutor, as_completed
+    cp_workers = max(4, min(workers, 8))
+
+    def _fetch_cp(code):
         try:
             cp = get_hk_current_price(code)
             if cp is None:
                 cp = latest_close.get(code)   # 实时价失败 → 回退月度价格缓存
-            current_price_map[code] = cp
+            return code, cp
         except Exception as e:
             logger.debug(f"current_price {code}: {e}")
-            current_price_map[code] = latest_close.get(code)
-        if (i + 1) % 100 == 0:
-            logger.info(f"  current_price [{i+1}/{len(stock_list)}]")
+            return code, latest_close.get(code)
+
+    with ThreadPoolExecutor(max_workers=cp_workers) as exe:
+        futs = {exe.submit(_fetch_cp, c): c for c in codes_zf}
+        done = 0
+        for fut in as_completed(futs):
+            code, cp = fut.result()
+            current_price_map[code] = cp
+            done += 1
+            if done % 200 == 0 or done == len(codes_zf):
+                logger.info(f"  current_price [{done}/{len(codes_zf)}]")
 
     financial_df = incremental_update_financial(
         stock_list=stock_list,
