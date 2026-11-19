@@ -159,13 +159,16 @@ def list_pool_snapshots() -> list:
 # ============================================================
 
 def save_monthly_price(df: pd.DataFrame):
-    """追加月度价格数据，按 (code, date) 去重"""
+    """追加月度价格数据，按 (code, date) 去重。date 统一归一化到月末，避免
+    东财(月末)/yfinance(月初) 口径混用导致同月两条记录。"""
     _ensure_dirs()
     df["code"] = df["code"].astype(str).str.zfill(5)
-    df["date"] = pd.to_datetime(df["date"]).dt.strftime("%Y-%m-%d")
+    df["date"] = (pd.to_datetime(df["date"]) + pd.offsets.MonthEnd(0)).dt.strftime("%Y-%m-%d")
 
     if os.path.exists(MONTHLY_PRICE_CSV):
         existing = pd.read_csv(MONTHLY_PRICE_CSV, dtype={"code": str})
+        # 存量数据同样归一化到月末，再按 (code, date) 去重，顺带清理历史混用
+        existing["date"] = (pd.to_datetime(existing["date"]) + pd.offsets.MonthEnd(0)).dt.strftime("%Y-%m-%d")
         combined = pd.concat([existing, df], ignore_index=True)
         combined = combined.drop_duplicates(subset=["code", "date"], keep="last")
     else:
