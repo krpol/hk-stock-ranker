@@ -32,3 +32,8 @@ logs/
 # B46: hk daily 磁盘缓存
 data/cache/
 
+# data 备份文件（历史遗留 .bak/.broken/.日期 后缀，勿提交）
+data/csv/*.bak*
+data/csv/*.broken*
+data/csv/*.20*
+
