@@ -1104,6 +1104,20 @@ AK_ITEM_MAP: dict = {
     "net_income": ["股东应占溢利", "归属于母公司股东的净利润", "本公司拥有人应占溢利"],
 }
 
+# 东财港股财报接口（stock_financial_hk_report_em）返回中文列名，统一 rename 为下游英文列
+_EM_REPORT_RENAME = {
+    "项目名称": "STD_ITEM_NAME",
+    "报告期": "REPORT_DATE",
+    "金额": "AMOUNT",
+}
+
+
+def _norm_report_df(df: Optional[pd.DataFrame]) -> Optional[pd.DataFrame]:
+    """东财财报 df 中文列名 → 下游英文列（STD_ITEM_NAME/REPORT_DATE/AMOUNT），幂等。"""
+    if df is None or df.empty:
+        return df
+    return df.rename(columns=_EM_REPORT_RENAME)
+
 
 def _get_hk_report_akshare(code: str, symbol: str) -> Optional[pd.DataFrame]:
     """B34: 拉取 AKShare 港股「年度」报表（带模块级缓存）。
@@ -1117,9 +1131,7 @@ def _get_hk_report_akshare(code: str, symbol: str) -> Optional[pd.DataFrame]:
     df = None
     try:
         import akshare as ak
-        df = ak.stock_financial_hk_report_em(stock=code, symbol=symbol, indicator="年度")
-        if df is None or df.empty:
-            df = None
+        df = _norm_report_df(ak.stock_financial_hk_report_em(symbol=code, indicator=symbol, period="年度"))
     except Exception as e:
         logger.debug(f"[{code}] AKShare {symbol} 年度拉取失败: {e}")
         df = None
@@ -1385,12 +1397,16 @@ def _get_growth_from_akshare(code: str) -> Optional[dict]:
     try:
         import akshare as ak
         # B17: 主用「报告期」（YTD 累计，覆盖年报+半年报+季报）；辅助「年度」识别真正的财年末月日
-        is_df = ak.stock_financial_hk_report_em(stock=code, symbol="利润表", indicator="报告期")
-        cf_df = ak.stock_financial_hk_report_em(stock=code, symbol="现金流量表", indicator="报告期")
+        is_df = ak.stock_financial_hk_report_em(symbol=code, indicator="利润表", period="报告期")
+        cf_df = ak.stock_financial_hk_report_em(symbol=code, indicator="现金流量表", period="报告期")
         try:
-            is_yr = ak.stock_financial_hk_report_em(stock=code, symbol="利润表", indicator="年度")
+            is_yr = ak.stock_financial_hk_report_em(symbol=code, indicator="利润表", period="年度")
         except Exception:
             is_yr = None
+        # 东财返回中文列名，统一 rename 为下游英文列
+        is_df = _norm_report_df(is_df)
+        cf_df = _norm_report_df(cf_df)
+        is_yr = _norm_report_df(is_yr)
     except Exception as e:
         logger.warning(f"[{code}] AKShare 兜底拉取失败: {e}")
         return None

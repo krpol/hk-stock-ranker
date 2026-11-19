@@ -98,8 +98,7 @@ def get_hk_stock_list(max_retries: int = 5) -> pd.DataFrame:
     获取港股主板全量股票列表（含实时行情快照）。
     按优先级依次尝试：
       1. AKShare stock_hk_spot_em（东方财富，字段最全）
-      2. AKShare stock_hk_spot（港交所数据，备用）
-      3. curl 直接请求东方财富接口
+      2. curl 直接请求东方财富接口（stock_hk_spot 港交所源已在 akshare 移除）
 
     过滤逻辑：
       1. 成交量为 0 → 当日停牌，直接过滤
@@ -126,26 +125,7 @@ def get_hk_stock_list(max_retries: int = 5) -> pd.DataFrame:
             logger.warning(f"stock_hk_spot_em 失败（第{attempt}/{max_retries}次）: {e}，{wait}秒后重试...")
             time.sleep(wait)
 
-    # ---- 方案2：AKShare stock_hk_spot（港交所）----
-    if df.empty:
-        logger.info("回退到 AKShare stock_hk_spot（港交所数据源）...")
-        for attempt in range(1, max_retries + 1):
-            try:
-                df = ak.stock_hk_spot()
-                rename_map = {
-                    "代码": "code", "中文名称": "name", "最新价": "price",
-                    "涨跌幅": "pct_change", "成交量": "volume", "成交额": "amount",
-                }
-                df = df.rename(columns={k: v for k, v in rename_map.items() if k in df.columns})
-                df["code"] = df["code"].astype(str).str.zfill(5)
-                logger.info(f"AKShare stock_hk_spot 成功，共 {len(df)} 只")
-                break
-            except Exception as e:
-                wait = 3 * attempt
-                logger.warning(f"stock_hk_spot 失败（第{attempt}/{max_retries}次）: {e}，{wait}秒后重试...")
-                time.sleep(wait)
-
-    # ---- 方案3：curl 直接请求东方财富 ----
+    # ---- 方案2：curl 直接请求东方财富（港交所源 stock_hk_spot 已在 akshare 移除）----
     if df.empty:
         logger.info("回退到 curl 直接请求东方财富...")
         df = _fetch_hk_spot_direct(max_retries=max_retries)
@@ -187,7 +167,7 @@ def get_hk_monthly_price(
     code = str(code).zfill(5)   # B51: 统一 5 位，保证 failed sidecar key 一致
     for attempt in range(1, max_retries + 1):
         try:
-            df = ak.stock_hk_hist(
+            df = ak.stock_hk_hist_em(
                 symbol=code,
                 period="monthly",
                 start_date=start_date,
@@ -260,7 +240,7 @@ def get_hk_monthly_price_dual(
 def get_hk_current_price(code: str) -> Optional[float]:
     """获取港股当前（最新）收盘价（不复权）"""
     try:
-        df = ak.stock_hk_hist(
+        df = ak.stock_hk_hist_em(
             symbol=code,
             period="daily",
             start_date="20200101",
@@ -571,12 +551,24 @@ def _fetch_single_daily(code: str, use_cache: bool = True, force: bool = False) 
             _prev_sock_timeout = socket.getdefaulttimeout()
             socket.setdefaulttimeout(45)
             try:
-                df = ak.stock_hk_daily(symbol=code, adjust="")
+                # stock_hk_daily(新浪源)已在 akshare 移除，改用东财 stock_hk_hist_em
+                df = ak.stock_hk_hist_em(
+                    symbol=code,
+                    period="daily",
+                    start_date="19700101",
+                    end_date=pd.Timestamp.today().strftime("%Y%m%d"),
+                    adjust="",
+                )
             finally:
                 socket.setdefaulttimeout(_prev_sock_timeout)
             if df is None or df.empty:
                 _mark_failed(code, "empty result")
                 return None
+            # 东财源返回中文列名，统一 rename 为英文
+            df = df.rename(columns={
+                "日期": "date", "开盘": "open", "收盘": "close",
+                "最高": "high", "最低": "low", "成交量": "volume", "成交额": "amount",
+            })
             # B47.1: 检查数据结构。债券/衍生品/未上市新股 (40xxx/85xxx/89xxx 等)
             # 会返回不含 date 列的异常结构，直接标记死码不再重试
             if "date" not in df.columns:
