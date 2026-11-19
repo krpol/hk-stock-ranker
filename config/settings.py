@@ -101,3 +101,38 @@ BACKTEST_DEFAULT_WEIGHT = "equal"
 BACKTEST_RISK_FREE_RATE = 0.03
 # 五分位组数（默认 5）
 BACKTEST_QUANTILE_COUNT = 5
+
+# ============================================================
+# 网络代理配置
+# ============================================================
+# 统一出口代理：规避「直连 / WorkBuddy 沙箱代理出口 IP 被东财、yfinance 限流」的问题。
+# 默认自动探测本机代理端口（127.0.0.1:6864，如 Atlas/Clash 等）；可用环境变量
+# HK_RANKER_PROXY 显式覆盖；探测失败则不设代理（直连）。
+# 所有采集请求（akshare / yfinance / curl）统一读此环境变量，一处设置全局生效。
+NETWORK_PROXY = os.environ.get("HK_RANKER_PROXY", "").strip()
+_NETWORK_PROXY_DEFAULT_HOST = "127.0.0.1"
+_NETWORK_PROXY_DEFAULT_PORT = 6864
+
+
+def _port_open(host: str, port: int, timeout: float = 1.0) -> bool:
+    import socket
+    try:
+        with socket.create_connection((host, port), timeout=timeout):
+            return True
+    except OSError:
+        return False
+
+
+def apply_network_proxy() -> str:
+    """设置统一出口代理，返回生效的代理 URL（空串表示直连）。"""
+    proxy = NETWORK_PROXY
+    if not proxy and _port_open(_NETWORK_PROXY_DEFAULT_HOST, _NETWORK_PROXY_DEFAULT_PORT):
+        proxy = f"http://{_NETWORK_PROXY_DEFAULT_HOST}:{_NETWORK_PROXY_DEFAULT_PORT}"
+    if proxy:
+        for key in ("HTTP_PROXY", "HTTPS_PROXY", "http_proxy", "https_proxy"):
+            os.environ[key] = proxy
+    return proxy
+
+
+# 模块加载即应用代理：main.py 与 scripts/*.py 只要 import config.settings 即生效
+apply_network_proxy()
