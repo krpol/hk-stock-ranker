@@ -20,7 +20,7 @@ import pandas as pd
 # 确保项目根目录在 PATH 中
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-from config.settings import HK_STOCK_FILTERS, HISTORY_YEARS
+from config.settings import HK_STOCK_FILTERS, HISTORY_YEARS, POOL_REBUILD_INTERVAL_DAYS
 from collectors.hk_price import get_hk_stock_list, get_hk_monthly_price, get_hk_monthly_price_dual, get_hk_current_price, save_monthly_failed, load_monthly_failed_codes
 from collectors.hk_financial import collect_financial_data, has_dividend_history, has_share_dilution, has_recent_dividend_or_forward
 from collectors.hk_forward_dividend import collect_forward_dividends, get_forward_div_map
@@ -97,53 +97,6 @@ def _run_stale_scan_and_refresh(stock_list, forward_div_map, tag: str = "stale-s
     )
     if stale_after:
         logger.warning(f"{tag}: 仍残留 stale {stale_after}")
-
-
-"""
-主入口
-用法：
-  python main.py --rebuild-pool     # 年度重建股票池（筛选有分红的股票）
-  python main.py --update           # 月度更新：采集数据 + 计算排名
-  python main.py --rank-only        # 仅重新计算排名（使用已保存的财务数据）
-  python main.py --web              # 启动 Web 服务
-  python main.py --schedule         # 启动月度定时调度（后台常驻）
-  python main.py --update --web     # 月度更新后直接启动 Web
-"""
-import os
-import sys
-import time
-import logging
-import argparse
-from datetime import datetime
-
-import pandas as pd
-
-# 确保项目根目录在 PATH 中
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-
-from config.settings import HK_STOCK_FILTERS, HISTORY_YEARS, POOL_REBUILD_INTERVAL_DAYS
-from collectors.hk_price import get_hk_stock_list, get_hk_monthly_price, get_hk_monthly_price_dual, get_hk_current_price
-from collectors.hk_financial import collect_financial_data, has_dividend_history
-from collectors.hk_forward_dividend import collect_forward_dividends, get_forward_div_map
-from storage.store import (
-    save_stock_list, load_stock_list,
-    save_stock_pool, load_stock_pool, get_stock_pool_age_days,
-    save_monthly_price, load_monthly_price,
-    save_financial_data, load_financial_data,
-    save_ranking, list_ranking_periods,
-    prune_old_data,
-)
-from engine.ranker import rank_stocks
-
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
-    handlers=[
-        logging.StreamHandler(),
-        logging.FileHandler("hk_ranker.log", encoding="utf-8"),
-    ],
-)
-logger = logging.getLogger(__name__)
 
 
 def run_rebuild_pool(as_of_date: datetime = None, liquidity_window: int = None):
