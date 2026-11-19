@@ -1723,6 +1723,8 @@ def collect_financial_data(code: str, forward_div_override: Optional[float] = No
     growth_data: dict = {}
     net_debt_ratio = total_liability_ratio = debt_to_equity = roe = None
     cash_and_equivalents = interest_bearing_debt = None
+    liquid_financial_assets = prev_cash_and_equivalents = None
+    prev_liquid_financial_assets = prev_interest_bearing_debt = None
     ocf_3y_avg = capex_3y_avg = dep_amortization_3y_avg = None
     current_lease_obligation_prev = equity_latest = None
     capex_ttm = da_ttm = current_lease_obligation_ttm = prev_capex = prev_da = None
@@ -1772,6 +1774,10 @@ def collect_financial_data(code: str, forward_div_override: Optional[float] = No
             roe = debt_ratios.get("roe")
             cash_and_equivalents = debt_ratios.get("cash_and_equivalents")
             interest_bearing_debt = debt_ratios.get("interest_bearing_debt")
+            liquid_financial_assets = debt_ratios.get("liquid_financial_assets")
+            prev_cash_and_equivalents = debt_ratios.get("prev_cash_and_equivalents")
+            prev_liquid_financial_assets = debt_ratios.get("prev_liquid_financial_assets")
+            prev_interest_bearing_debt = debt_ratios.get("prev_interest_bearing_debt")
             debt_as_of = debt_ratios.get("debt_as_of")
             if (net_debt_ratio is not None
                     or total_liability_ratio is not None
@@ -1788,6 +1794,10 @@ def collect_financial_data(code: str, forward_div_override: Optional[float] = No
             roe = None
             cash_and_equivalents = None
             interest_bearing_debt = None
+            liquid_financial_assets = None
+            prev_cash_and_equivalents = None
+            prev_liquid_financial_assets = None
+            prev_interest_bearing_debt = None
             debt_as_of = None
             domain_status["debt"] = "fail"
             domain_reason["debt"] = str(e)[:200]
@@ -1884,6 +1894,10 @@ def collect_financial_data(code: str, forward_div_override: Optional[float] = No
         "roe": roe,
         "cash_and_equivalents": cash_and_equivalents,
         "interest_bearing_debt": interest_bearing_debt,
+        "liquid_financial_assets": liquid_financial_assets,
+        "prev_cash_and_equivalents": prev_cash_and_equivalents,
+        "prev_liquid_financial_assets": prev_liquid_financial_assets,
+        "prev_interest_bearing_debt": prev_interest_bearing_debt,
         "debt_as_of": debt_as_of,
         "annual_dilution_rate": annual_dilution_rate,
         "ocf_3y_avg": ocf_3y_avg,

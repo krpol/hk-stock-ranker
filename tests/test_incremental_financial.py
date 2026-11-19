@@ -348,3 +348,35 @@ class TestFcfDomainIsolation:
         assert rec["_status"]["debt"] == "ok"
         assert rec["_status"]["fcf"] == "fail"
         assert rec["_reason"]["fcf"] == "get_fcf_components returned None"
+
+
+class TestDebtFieldPassThrough:
+
+    def test_collect_passes_through_net_cash_fields(self, monkeypatch):
+        """debt 域 ok 时，广义现金 4 字段（B40/B41）从 get_debt_ratios 透传到 result，不再冻结"""
+        import collectors.hk_financial as hkf
+
+        debt_ret = {
+            "net_debt_ratio": 0.3,
+            "debt_as_of": "2025-12-31",
+            "liquid_financial_assets": 500.0,
+            "prev_cash_and_equivalents": 1000.0,
+            "prev_liquid_financial_assets": 400.0,
+            "prev_interest_bearing_debt": 200.0,
+        }
+        monkeypatch.setattr(hkf, "get_debt_ratios", lambda code: debt_ret)
+        monkeypatch.setattr(hkf, "get_fcf_components", lambda code: {})
+        monkeypatch.setattr(hkf, "get_fiscal_year_dividends",
+                            lambda code, forward_div_override=None: {"fiscal_periods": "[]"})
+        monkeypatch.setattr(hkf, "get_fiscal_year_buyback",
+                            lambda code: {"shares_outstanding": 100})
+        monkeypatch.setattr(hkf, "get_annual_dilution_rate", lambda code, years=3: 0.0)
+        monkeypatch.setattr(hkf, "get_growth_metrics", lambda code: {})
+        monkeypatch.setattr(hkf.time, "sleep", lambda s: None)
+
+        rec = hkf.collect_financial_data("00001")
+        assert rec["liquid_financial_assets"] == 500.0
+        assert rec["prev_cash_and_equivalents"] == 1000.0
+        assert rec["prev_liquid_financial_assets"] == 400.0
+        assert rec["prev_interest_bearing_debt"] == 200.0
+        assert rec["debt_as_of"] == "2025-12-31"
