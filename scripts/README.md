@@ -8,7 +8,7 @@
 |---|---|---|
 | `backfill_pools.py` | 历史股票池回填 | `main.py --backfill-pools` 内部 import |
 | `backfill_rankings.py` | 历史 ranking 回填 | `main.py --backfill-rankings` 内部 import |
-| `backfill_july_missing.py` | 补刷缺失月末价（月度模板，按当月改名） | 月度流程 Step 2（见 docs/MONTHLY_ROUTINE.md） |
+| `backfill_missing_month.py` | 补刷缺失月末价（`--period YYYY-MM`，缺省当前月） | 月度流程 Step 2（见 docs/MONTHLY_ROUTINE.md） |
 | `data_quality_check.py` | 数据质量体检（依赖 field_registry） | 测试 import |
 | `patch_missing_fields.py` | 重拉 hk_financial.csv 中采集失败的行 | 手动 |
 | `refresh_dividend_only.py` | 单只/批量重算派息归属（`recompute_dividends_for_code`） | 测试 import + 手动 |

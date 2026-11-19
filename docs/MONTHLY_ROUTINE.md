@@ -33,10 +33,10 @@
 ### Step 2：补刷失败 code
 
 ```bash
-.venv/bin/python scripts/backfill_july_missing.py  # 脚本名按当月改
+.venv/bin/python scripts/backfill_missing_month.py --period YYYY-MM  # YYYY-MM 改为目标月，缺省即当前月
 ```
 
-> **注**：脚本名 `backfill_july_missing.py` 是 B37 临时脚本，针对 7 月。长期应改为通用 `backfill_missing_month.py`（接受 `--period YYYY-MM` 参数）。当前实现会自动识别当前 CSV 中缺失当月的 code 并补刷。
+> **注**：脚本已通用化为 `backfill_missing_month.py`，`--period` 缺省时自动识别当前月。会自动识别 CSV 中缺失该月的 code 并定向补刷（只拉缺失 code，比全量快 5-10 倍）。
 
 - 自动识别缺失当月价格的 code，只针对缺失的重拉
 - **耗时**：~15-30 分钟（视失败数量）
@@ -121,7 +121,7 @@ git push
 
 **处理**：
 1. 串行单只测试可成功 → 确认是并发限流
-2. 降低并发：`backfill_july_missing.py` 中 `max_workers=4` 改为 `2`
+2. 降低并发：`backfill_missing_month.py` 中 `max_workers=4` 改为 `2`
 3. 多轮重试（每轮补回一部分）
 4. yfinance fallback：当前 `get_hk_monthly_price_dual` 未集成 yfinance，未来可加（仅用 close 价就够排名）
 
