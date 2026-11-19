@@ -152,20 +152,22 @@ def needs_refresh(row: pd.Series, ttl_days: int = FINANCIAL_REFRESH_TTL_DAYS,
 
 
 def _collect_one(code: str, forward_div_override: Optional[float],
-                 check_dividend_history: bool) -> Optional[dict]:
+                 check_dividend_history: bool, domains: Optional[list] = None) -> Optional[dict]:
     try:
         return collect_financial_data(
             code,
             forward_div_override=forward_div_override,
             check_dividend_history=check_dividend_history,
+            domains=domains,
         )
     except Exception as e:
         logger.warning(f"采集失败 {code}: {e}")
-        # 整体异常 → 全 domain fail
+        # 整体异常：请求的域标 fail、未请求的域标 skip（保留旧值，不误伤）
+        want = set(domains) if domains else None
         return {
             "code": code,
-            "_status": {d: "fail" for d in ALL_DOMAINS},
-            "_reason": {d: f"top_exception: {str(e)[:160]}" for d in ALL_DOMAINS},
+            "_status": {d: ("fail" if want is None or d in want else "skip") for d in ALL_DOMAINS},
+            "_reason": {d: f"top_exception: {str(e)[:160]}" for d in (ALL_DOMAINS if want is None else want)},
         }
 
 
@@ -386,6 +388,21 @@ def incremental_update_financial(
         except Exception as e:
             logger.warning(f"  [checkpoint] {tag} 落盘失败（不影响主流程）: {str(e)[:120]}")
 
+    def _code_domains(code: str) -> Optional[list]:
+        """该 code 本次要采集的 domain 集合；None 表示全量。
+
+        - 外部显式 domains 优先（用户指定"只刷某域"）
+        - 否则取 failed_map 里该 code 已失败的域（B52 精准重拉失败域，成功域复用缓存）
+        """
+        if domains:
+            return list(domains)
+        fd = failed_map.get(code)
+        if isinstance(fd, dict):
+            ds = [d for d in fd if d in ALL_DOMAINS]
+            if ds:
+                return ds
+        return None
+
     new_records: list[dict] = []
     if to_refresh:
         with ThreadPoolExecutor(max_workers=workers) as exe:
@@ -395,6 +412,7 @@ def incremental_update_financial(
                     code,
                     forward_div_map.get(code),
                     check_dividend_history,
+                    _code_domains(code),
                 ): code
                 for code, _ in to_refresh
             }
@@ -412,8 +430,7 @@ def incremental_update_financial(
                     except Exception as e:
                         logger.warning(f"  [{code}] 采集异常/超时，记为 failed: {type(e).__name__} {str(e)[:80]}")
                         failed_map[code] = {
-                            "reason": f"{type(e).__name__}: {str(e)[:150]}",
-                            "last_try": now_str,
+                            d: f"{type(e).__name__}: {str(e)[:150]}" for d in ALL_DOMAINS
                         }
                         rec = None
                     done += 1
@@ -425,14 +442,7 @@ def incremental_update_financial(
                         if code in current_price_map:
                             rec["current_price"] = current_price_map[code]
 
-                        # domains 限制：将不在 domains 的 status 改为 "skip"（不写 row、不写 sidecar）
-                        if domains:
-                            status_map = rec.get("_status") or {}
-                            for d in list(status_map.keys()):
-                                if d not in domains:
-                                    status_map[d] = "skip"
-                            rec["_status"] = status_map
-
+                        # B52: collect_financial_data / _collect_one 已按 domains 标 skip，此处直接合并
                         # 按 status 合并到现有 row
                         existing_row = existing.loc[code] if (not existing.empty and code in existing.index) else None
                         merged = _merge_record_by_status(existing_row, rec, failed_map, empty_map, now_str)
@@ -450,8 +460,7 @@ def incremental_update_financial(
                 for fut in pending:
                     code = futures[fut]
                     failed_map[code] = {
-                        "reason": "future timeout (never returned)",
-                        "last_try": now_str,
+                        d: "future timeout (never returned)" for d in ALL_DOMAINS
                     }
                     fut.cancel()
 

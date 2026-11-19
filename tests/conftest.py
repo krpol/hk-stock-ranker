@@ -120,13 +120,14 @@ def mock_collect(monkeypatch):
     """mock collect_financial_data 返回固定结构，记录所有调用"""
     call_log = []
 
-    def fake_collect(code, forward_div_override=None, check_dividend_history=True):
+    def fake_collect(code, forward_div_override=None, check_dividend_history=True, domains=None):
         call_log.append(code)
         rec = _make_fin_record(code)
         # 真实 collect_financial_data 必带 _status；缺失时 _merge_record_by_status
         # 会把每个 domain 默认判 fail 而不写入任何字段，结果只剩 code 列。
         from collectors.hk_financial import ALL_DOMAINS
-        rec["_status"] = {d: "ok" for d in ALL_DOMAINS}
+        want = set(domains) if domains else None
+        rec["_status"] = {d: ("ok" if want is None or d in want else "skip") for d in ALL_DOMAINS}
         rec["_reason"] = {}
         return rec
 

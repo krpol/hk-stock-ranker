@@ -38,11 +38,12 @@ DOMAIN_FIELDS: dict = {
     "debt": ["net_debt_ratio", "total_liability_ratio", "debt_to_equity", "roe", "cash_and_equivalents", "interest_bearing_debt",
              "prev_cash_and_equivalents", "prev_interest_bearing_debt",
              "liquid_financial_assets", "prev_liquid_financial_assets",
-             "ocf_3y_avg", "capex_3y_avg", "dep_amortization_3y_avg", "current_lease_obligation_prev", "equity_latest",
+             "debt_as_of"],
+    "fcf": ["ocf_3y_avg", "capex_3y_avg", "dep_amortization_3y_avg", "current_lease_obligation_prev", "equity_latest",
              "capex_ttm", "da_ttm", "current_lease_obligation_ttm", "prev_capex", "prev_da",
              "interest_paid_financing_3y", "interest_received_investing_3y",
              "interest_paid_financing_ttm", "interest_received_investing_ttm",
-             "fcf_as_of", "debt_as_of"],
+             "fcf_as_of"],
     "dilution": ["annual_dilution_rate"],
     "growth": [
         "ttm_revenue", "prev_ttm_revenue", "ttm_revenue_t2", "revenue_yoy",
@@ -1698,132 +1699,179 @@ def get_growth_metrics(code: str) -> dict:
         return out
 
 
-def collect_financial_data(code: str, forward_div_override: Optional[float] = None, check_dividend_history: bool = True) -> dict:
+def collect_financial_data(code: str, forward_div_override: Optional[float] = None, check_dividend_history: bool = True, domains: Optional[list] = None) -> dict:
     """
     汇总单只股票的财务数据（分红+回购+负债率+成长）
 
     B16: 增加 _status 字段（每个子维度 ok/empty/fail）+ _reason
+    B52: domains 参数——只采集指定子维度，其余标 skip（供失败域精准重拉，成功域复用缓存不重复爬取）
     """
     from config.settings import HK_STOCK_FILTERS
 
     domain_status: dict = {}
     domain_reason: dict = {}
 
+    want = set(domains) if domains else None
+    if want is not None:
+        for d in ALL_DOMAINS:
+            if d not in want:
+                domain_status[d] = "skip"
+
+    # 各 domain 局部变量默认值，避免 skip 时下方 result 引用未定义
+    div_data: dict = {}
+    buyback_data: dict = {}
+    growth_data: dict = {}
+    net_debt_ratio = total_liability_ratio = debt_to_equity = roe = None
+    cash_and_equivalents = interest_bearing_debt = None
+    ocf_3y_avg = capex_3y_avg = dep_amortization_3y_avg = None
+    current_lease_obligation_prev = equity_latest = None
+    capex_ttm = da_ttm = current_lease_obligation_ttm = prev_capex = prev_da = None
+    interest_paid_financing_3y = interest_received_investing_3y = None
+    interest_paid_financing_ttm = interest_received_investing_ttm = None
+    annual_dilution_rate = None
+    debt_as_of = None
+    fcf_as_of = None
+
     # ── dividend ─────────────────────────────────────────────────
-    try:
-        div_data = get_fiscal_year_dividends(code, forward_div_override=forward_div_override)
-        fps = div_data.get("fiscal_periods")
-        has_fp = bool(fps) and (not isinstance(fps, str) or fps.strip() not in ("", "[]"))
-        if has_fp or div_data.get("fy_div_per_share") or div_data.get("forward_div_per_share"):
-            domain_status["dividend"] = "ok"
-        else:
-            domain_status["dividend"] = "empty"
-    except Exception as e:
-        logger.warning(f"[{code}] dividend 采集失败: {e}")
-        div_data = {}
-        domain_status["dividend"] = "fail"
-        domain_reason["dividend"] = str(e)[:200]
+    if want is None or "dividend" in want:
+        try:
+            div_data = get_fiscal_year_dividends(code, forward_div_override=forward_div_override)
+            fps = div_data.get("fiscal_periods")
+            has_fp = bool(fps) and (not isinstance(fps, str) or fps.strip() not in ("", "[]"))
+            if has_fp or div_data.get("fy_div_per_share") or div_data.get("forward_div_per_share"):
+                domain_status["dividend"] = "ok"
+            else:
+                domain_status["dividend"] = "empty"
+        except Exception as e:
+            logger.warning(f"[{code}] dividend 采集失败: {e}")
+            div_data = {}
+            domain_status["dividend"] = "fail"
+            domain_reason["dividend"] = str(e)[:200]
 
     # ── buyback ──────────────────────────────────────────────────
-    try:
-        buyback_data = get_fiscal_year_buyback(code)
-        if buyback_data.get("shares_outstanding"):
-            domain_status["buyback"] = "ok"
-        else:
-            domain_status["buyback"] = "empty"
-    except Exception as e:
-        logger.warning(f"[{code}] buyback 采集失败: {e}")
-        buyback_data = {}
-        domain_status["buyback"] = "fail"
-        domain_reason["buyback"] = str(e)[:200]
+    if want is None or "buyback" in want:
+        try:
+            buyback_data = get_fiscal_year_buyback(code)
+            if buyback_data.get("shares_outstanding"):
+                domain_status["buyback"] = "ok"
+            else:
+                domain_status["buyback"] = "empty"
+        except Exception as e:
+            logger.warning(f"[{code}] buyback 采集失败: {e}")
+            buyback_data = {}
+            domain_status["buyback"] = "fail"
+            domain_reason["buyback"] = str(e)[:200]
 
     # ── debt ─────────────────────────────────────────────────────
-    try:
-        debt_ratios = get_debt_ratios(code) or {}
-        net_debt_ratio = debt_ratios.get("net_debt_ratio")
-        total_liability_ratio = debt_ratios.get("total_liability_ratio")
-        debt_to_equity = debt_ratios.get("debt_to_equity")
-        roe = debt_ratios.get("roe")
-        cash_and_equivalents = debt_ratios.get("cash_and_equivalents")
-        interest_bearing_debt = debt_ratios.get("interest_bearing_debt")
-        if (net_debt_ratio is not None
-                or total_liability_ratio is not None
-                or debt_to_equity is not None
-                or roe is not None):
-            domain_status["debt"] = "ok"
-        else:
-            domain_status["debt"] = "empty"
-    except Exception as e:
-        logger.warning(f"[{code}] debt 采集失败: {e}")
-        net_debt_ratio = None
-        total_liability_ratio = None
-        debt_to_equity = None
-        roe = None
-        cash_and_equivalents = None
-        interest_bearing_debt = None
-        domain_status["debt"] = "fail"
-        domain_reason["debt"] = str(e)[:200]
+    if want is None or "debt" in want:
+        try:
+            debt_ratios = get_debt_ratios(code) or {}
+            net_debt_ratio = debt_ratios.get("net_debt_ratio")
+            total_liability_ratio = debt_ratios.get("total_liability_ratio")
+            debt_to_equity = debt_ratios.get("debt_to_equity")
+            roe = debt_ratios.get("roe")
+            cash_and_equivalents = debt_ratios.get("cash_and_equivalents")
+            interest_bearing_debt = debt_ratios.get("interest_bearing_debt")
+            debt_as_of = debt_ratios.get("debt_as_of")
+            if (net_debt_ratio is not None
+                    or total_liability_ratio is not None
+                    or debt_to_equity is not None
+                    or roe is not None):
+                domain_status["debt"] = "ok"
+            else:
+                domain_status["debt"] = "empty"
+        except Exception as e:
+            logger.warning(f"[{code}] debt 采集失败: {e}")
+            net_debt_ratio = None
+            total_liability_ratio = None
+            debt_to_equity = None
+            roe = None
+            cash_and_equivalents = None
+            interest_bearing_debt = None
+            debt_as_of = None
+            domain_status["debt"] = "fail"
+            domain_reason["debt"] = str(e)[:200]
 
     # ── fcf components (B31 + B32) ───────────────────────────────
-    try:
-        fcf_comps = get_fcf_components(code) or {}
-        ocf_3y_avg = fcf_comps.get("ocf_3y_avg")
-        capex_3y_avg = fcf_comps.get("capex_3y_avg")
-        dep_amortization_3y_avg = fcf_comps.get("dep_amortization_3y_avg")
-        current_lease_obligation_prev = fcf_comps.get("current_lease_obligation_prev")
-        equity_latest = fcf_comps.get("equity_latest")
-        # B32: TTM 字段
-        capex_ttm = fcf_comps.get("capex_ttm")
-        da_ttm = fcf_comps.get("da_ttm")
-        current_lease_obligation_ttm = fcf_comps.get("current_lease_obligation_ttm")
-        # B33: 上年同期 capex/da
-        prev_capex = fcf_comps.get("prev_capex")
-        prev_da = fcf_comps.get("prev_da")
-        # B42: 融资净利息
-        interest_paid_financing_3y = fcf_comps.get("interest_paid_financing_3y")
-        interest_received_investing_3y = fcf_comps.get("interest_received_investing_3y")
-        interest_paid_financing_ttm = fcf_comps.get("interest_paid_financing_ttm")
-        interest_received_investing_ttm = fcf_comps.get("interest_received_investing_ttm")
-    except Exception as e:
-        logger.warning(f"[{code}] fcf_components 采集失败: {e}")
-        ocf_3y_avg = None
-        capex_3y_avg = None
-        dep_amortization_3y_avg = None
-        current_lease_obligation_prev = None
-        equity_latest = None
-        capex_ttm = None
-        da_ttm = None
-        current_lease_obligation_ttm = None
-        prev_capex = None
-        prev_da = None
-        interest_paid_financing_3y = None
-        interest_received_investing_3y = None
-        interest_paid_financing_ttm = None
-        interest_received_investing_ttm = None
+    # B52: 独立 fcf 域——get_fcf_components 失败/为空不再被 debt 域成功掩盖，
+    #      避免 fcf 好值被 debt ok 覆盖成 None。
+    if want is None or "fcf" in want:
+        try:
+            fcf_comps = get_fcf_components(code)
+            if fcf_comps is None:
+                domain_status["fcf"] = "fail"
+                domain_reason["fcf"] = "get_fcf_components returned None"
+            else:
+                ocf_3y_avg = fcf_comps.get("ocf_3y_avg")
+                capex_3y_avg = fcf_comps.get("capex_3y_avg")
+                dep_amortization_3y_avg = fcf_comps.get("dep_amortization_3y_avg")
+                current_lease_obligation_prev = fcf_comps.get("current_lease_obligation_prev")
+                equity_latest = fcf_comps.get("equity_latest")
+                # B32: TTM 字段
+                capex_ttm = fcf_comps.get("capex_ttm")
+                da_ttm = fcf_comps.get("da_ttm")
+                current_lease_obligation_ttm = fcf_comps.get("current_lease_obligation_ttm")
+                # B33: 上年同期 capex/da
+                prev_capex = fcf_comps.get("prev_capex")
+                prev_da = fcf_comps.get("prev_da")
+                # B42: 融资净利息
+                interest_paid_financing_3y = fcf_comps.get("interest_paid_financing_3y")
+                interest_received_investing_3y = fcf_comps.get("interest_received_investing_3y")
+                interest_paid_financing_ttm = fcf_comps.get("interest_paid_financing_ttm")
+                interest_received_investing_ttm = fcf_comps.get("interest_received_investing_ttm")
+                # B35: 数据血缘
+                fcf_as_of = fcf_comps.get("fcf_as_of")
+                if (ocf_3y_avg is not None
+                        or equity_latest is not None
+                        or capex_ttm is not None):
+                    domain_status["fcf"] = "ok"
+                else:
+                    domain_status["fcf"] = "empty"
+        except Exception as e:
+            logger.warning(f"[{code}] fcf_components 采集失败: {e}")
+            ocf_3y_avg = None
+            capex_3y_avg = None
+            dep_amortization_3y_avg = None
+            current_lease_obligation_prev = None
+            equity_latest = None
+            capex_ttm = None
+            da_ttm = None
+            current_lease_obligation_ttm = None
+            prev_capex = None
+            prev_da = None
+            interest_paid_financing_3y = None
+            interest_received_investing_3y = None
+            interest_paid_financing_ttm = None
+            interest_received_investing_ttm = None
+            fcf_as_of = None
+            domain_status["fcf"] = "fail"
+            domain_reason["fcf"] = str(e)[:200]
 
     # ── dilution ─────────────────────────────────────────────────
-    try:
-        annual_dilution_rate = get_annual_dilution_rate(code, years=3)
-        domain_status["dilution"] = "ok" if annual_dilution_rate is not None else "empty"
-    except Exception as e:
-        logger.warning(f"[{code}] dilution 采集失败: {e}")
-        annual_dilution_rate = None
-        domain_status["dilution"] = "fail"
-        domain_reason["dilution"] = str(e)[:200]
+    if want is None or "dilution" in want:
+        try:
+            annual_dilution_rate = get_annual_dilution_rate(code, years=3)
+            domain_status["dilution"] = "ok" if annual_dilution_rate is not None else "empty"
+        except Exception as e:
+            logger.warning(f"[{code}] dilution 采集失败: {e}")
+            annual_dilution_rate = None
+            domain_status["dilution"] = "fail"
+            domain_reason["dilution"] = str(e)[:200]
 
     # ── growth ───────────────────────────────────────────────────
-    try:
-        growth_data = get_growth_metrics(code)
-        growth_status = growth_data.pop("_status", "ok")
-        growth_reason = growth_data.pop("_reason", "")
-        domain_status["growth"] = growth_status
-        if growth_status == "fail" and growth_reason:
-            domain_reason["growth"] = growth_reason
-    except Exception as e:
-        logger.warning(f"[{code}] growth 采集失败: {e}")
-        growth_data = {}
-        domain_status["growth"] = "fail"
-        domain_reason["growth"] = str(e)[:200]
+    if want is None or "growth" in want:
+        try:
+            growth_data = get_growth_metrics(code)
+            growth_status = growth_data.pop("_status", "ok")
+            growth_reason = growth_data.pop("_reason", "")
+            domain_status["growth"] = growth_status
+            if growth_status == "fail" and growth_reason:
+                domain_reason["growth"] = growth_reason
+        except Exception as e:
+            logger.warning(f"[{code}] growth 采集失败: {e}")
+            growth_data = {}
+            domain_status["growth"] = "fail"
+            domain_reason["growth"] = str(e)[:200]
 
     result = {
         "code": code,
@@ -1836,6 +1884,7 @@ def collect_financial_data(code: str, forward_div_override: Optional[float] = No
         "roe": roe,
         "cash_and_equivalents": cash_and_equivalents,
         "interest_bearing_debt": interest_bearing_debt,
+        "debt_as_of": debt_as_of,
         "annual_dilution_rate": annual_dilution_rate,
         "ocf_3y_avg": ocf_3y_avg,
         "capex_3y_avg": capex_3y_avg,
@@ -1851,6 +1900,7 @@ def collect_financial_data(code: str, forward_div_override: Optional[float] = No
         "interest_received_investing_3y": interest_received_investing_3y,
         "interest_paid_financing_ttm": interest_paid_financing_ttm,
         "interest_received_investing_ttm": interest_received_investing_ttm,
+        "fcf_as_of": fcf_as_of,
     }
 
     if forward_div_override is not None:
@@ -1858,7 +1908,7 @@ def collect_financial_data(code: str, forward_div_override: Optional[float] = No
     else:
         result["forward_div_source"] = "yfinance_estimate"
 
-    if check_dividend_history:
+    if check_dividend_history and (want is None or "dividend" in want):
         fy_div = float(div_data.get("fy_div_per_share", 0) or 0)
         fwd_div = float(div_data.get("forward_div_per_share", 0) or 0)
         prev_div = float(div_data.get("prev_year_div_per_share", 0) or 0)
@@ -1869,7 +1919,7 @@ def collect_financial_data(code: str, forward_div_override: Optional[float] = No
             + (1 if two_yrs_div > 0 else 0)
         )
         result["has_dividend_history"] = fy_count >= 2
-    else:
+    elif not check_dividend_history:
         result["has_dividend_history"] = True
 
     result["_status"] = domain_status
