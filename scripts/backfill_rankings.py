@@ -28,7 +28,10 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config.settings import HK_STOCK_FILTERS
 from engine.ranker import rank_stocks
-from backtest.point_in_time import load_dividend_history, ttm_dividend_matrix
+from backtest.point_in_time import (
+    load_dividend_history, ttm_dividend_matrix,
+    load_special_dividend_history, ttm_special_dividend_matrix,
+)
 from storage import store as _store
 from storage.store import (
     load_stock_pool, load_financial_data, load_monthly_price,
@@ -65,7 +68,9 @@ def backfill_one_month(period: str, stock_list: pd.DataFrame,
                         use_pool_snapshot: bool = True,
                         industry_df: pd.DataFrame = None,
                         pit_ttm: pd.DataFrame = None,
-                        pit_prev: pd.DataFrame = None) -> bool:
+                        pit_prev: pd.DataFrame = None,
+                        pit_special: pd.DataFrame = None,
+                        output_tag: str = "pit") -> bool:
     """对单月生成 ranking。返回是否实际生成（False=跳过）
 
     Args:
@@ -75,9 +80,12 @@ def backfill_one_month(period: str, stock_list: pd.DataFrame,
                  传入时用「时点前12个月除息分红」替换当前快照 fy_div_per_share，
                  根治前视偏差。
         pit_prev: point-in-time 上年 TTM 分红矩阵，替换 prev_year_div_per_share。
+        pit_special: point-in-time TTM 特别股息矩阵，传入时 fy_div_per_share
+                     减掉特别股息（可持续回报率）。
+        output_tag: 输出文件前缀标签，如 "pit" / "sus"。
     """
     if pit_ttm is not None:
-        target_path = os.path.join(_store.CSV_DIR, f"hk_ranking_pit_{period}.csv")
+        target_path = os.path.join(_store.CSV_DIR, f"hk_ranking_{output_tag}_{period}.csv")
     else:
         target_path = _store.RANKING_CSV.format(period=period)
     if skip_existing and os.path.exists(target_path):
@@ -111,6 +119,11 @@ def backfill_one_month(period: str, stock_list: pd.DataFrame,
         if pit_prev is not None and period in pit_prev.columns:
             prev = pit_prev[period]
             fin["prev_year_div_per_share"] = fin["code"].map(prev).fillna(0.0)
+        # 可持续回报率：剔除一次性特别股息
+        if pit_special is not None and period in pit_special.columns:
+            sp = pit_special[period]
+            fin["fy_div_per_share"] = (fin["fy_div_per_share"]
+                                       - fin["code"].map(sp).fillna(0.0)).clip(lower=0.0)
         logger.debug(f"  {period} 已应用 point-in-time 分红（时点 TTM 替换快照）")
 
     # 替换 current_price 为该月月底价（缺失则保留原值，避免误删）
@@ -174,10 +187,10 @@ def backfill_one_month(period: str, stock_list: pd.DataFrame,
         return False
 
     if pit_ttm is not None:
-        # PIT 模式：写独立文件（hk_ranking_pit_{period}.csv），便于与旧回填对比评测
-        pit_path = os.path.join(_store.CSV_DIR, f"hk_ranking_pit_{period}.csv")
+        # PIT/可持续模式：写独立文件，便于与旧回填对比评测
+        pit_path = os.path.join(_store.CSV_DIR, f"hk_ranking_{output_tag}_{period}.csv")
         ranked.to_csv(pit_path, index=False, encoding="utf-8-sig")
-        logger.info(f"  {period} ✓ PIT 生成 {len(ranked)} 行 → {os.path.basename(pit_path)}")
+        logger.info(f"  {period} ✓ {output_tag} 生成 {len(ranked)} 行 → {os.path.basename(pit_path)}")
     else:
         save_ranking(ranked, period)
         logger.info(f"  {period} ✓ 生成 {len(ranked)} 行（池 {len(pool_codes)}, 价格覆盖 {coverage:.0%}）")
@@ -193,6 +206,13 @@ def main():
     parser.add_argument("--pit", action="store_true",
                         help="point-in-time 模式：用时点 TTM 分红替换当前快照 fy_div_per_share，"
                              "根治前视偏差，输出 hk_ranking_pit_{period}.csv")
+    parser.add_argument("--sustainable", action="store_true",
+                        help="在 --pit 基础上剔除一次性特别股息（可持续回报率），"
+                             "输出 hk_ranking_sus_{period}.csv")
+    parser.add_argument("--announce", action="store_true",
+                        help="在 --pit 基础上，用「首次公告日」而非「除息日」切片 TTM 分红"
+                             "（信息事件口径，消除公告~除息之间的信号滞后），"
+                             "输出 hk_ranking_ann_{period}.csv；与 --sustainable 叠加输出 ann_sus")
     args = parser.parse_args()
 
     logger.info("===== 历史 ranking 回填开始 =====")
@@ -213,18 +233,36 @@ def main():
 
     price_wide = get_month_end_prices(price_df)
 
-    # PIT: 构建 point-in-time 分红矩阵（时点 TTM / 上年 TTM）
-    pit_ttm = pit_prev = None
+    # PIT: 构建 point-in-time 分红矩阵（时点 TTM / 上年 TTM / 特别股息）
+    pit_ttm = pit_prev = pit_special = None
+    output_tag = "pit"
     if args.pit:
         hist = load_dividend_history()
         if hist.empty:
             logger.error("分红历史为空，请先采集 point-in-time 数据（backtest.point_in_time）")
             return
+        # 事件时点口径：除息日（机械）vs 首次公告日（信息事件，用户 2026-11-20 口径）
+        event_col = "announce_date" if args.announce else "ex_date"
+        if args.announce and hist["announce_date"].notna().sum() == 0:
+            logger.warning("--announce 已指定，但分红历史无公告日（announce_date 全 NaT），"
+                           "将回退 ex_date。请先 collect_dividend_announce_dates 补齐。")
         all_months = list_available_months(price_wide)
         month_ends = [pd.Timestamp(m + "-01") + pd.offsets.MonthEnd(0) for m in all_months]
-        pit_ttm = ttm_dividend_matrix(hist, month_ends, months=12)
-        pit_prev = ttm_dividend_matrix(hist, month_ends, months=24) - pit_ttm
-        logger.info(f"point-in-time 分红矩阵已构建：{len(pit_ttm.index)} 只 × {len(pit_ttm.columns)} 期")
+        pit_ttm = ttm_dividend_matrix(hist, month_ends, months=12, event_col=event_col)
+        pit_prev = ttm_dividend_matrix(hist, month_ends, months=24, event_col=event_col) - pit_ttm
+        logger.info(f"point-in-time 分红矩阵已构建（event={event_col}）："
+                    f"{len(pit_ttm.index)} 只 × {len(pit_ttm.columns)} 期")
+        # 输出标签：pit（除息）/ ann（公告日）/ sus（可持续）/ ann_sus（公告日+可持续）
+        if args.announce and args.sustainable:
+            output_tag = "ann_sus"
+        elif args.sustainable:
+            output_tag = "sus"
+        elif args.announce:
+            output_tag = "ann"
+        if args.sustainable:
+            spec = load_special_dividend_history()
+            pit_special = ttm_special_dividend_matrix(spec, month_ends, months=12, event_col=event_col)
+            logger.info(f"特别股息矩阵已构建：{len(pit_special.index)} 只 × {len(pit_special.columns)} 期")
 
     # 起止月份计算
     end = args.end
@@ -248,6 +286,8 @@ def main():
             industry_df=industry_df,
             pit_ttm=pit_ttm,
             pit_prev=pit_prev,
+            pit_special=pit_special,
+            output_tag=output_tag,
         ):
             generated += 1
 
