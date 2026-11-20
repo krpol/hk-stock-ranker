@@ -28,6 +28,7 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from config.settings import HK_STOCK_FILTERS
 from engine.ranker import rank_stocks
+from backtest.point_in_time import load_dividend_history, ttm_dividend_matrix
 from storage import store as _store
 from storage.store import (
     load_stock_pool, load_financial_data, load_monthly_price,
@@ -62,14 +63,23 @@ def backfill_one_month(period: str, stock_list: pd.DataFrame,
                         financial_df: pd.DataFrame, price_wide: pd.DataFrame,
                         skip_existing: bool = True,
                         use_pool_snapshot: bool = True,
-                        industry_df: pd.DataFrame = None) -> bool:
+                        industry_df: pd.DataFrame = None,
+                        pit_ttm: pd.DataFrame = None,
+                        pit_prev: pd.DataFrame = None) -> bool:
     """对单月生成 ranking。返回是否实际生成（False=跳过）
 
     Args:
         use_pool_snapshot: True 时按 period 所属年份选 snapshot 池过滤；
                           False 时使用传入的 stock_list（向后兼容）
+        pit_ttm: point-in-time TTM 分红矩阵（index=code, columns=YYYY-MM）。
+                 传入时用「时点前12个月除息分红」替换当前快照 fy_div_per_share，
+                 根治前视偏差。
+        pit_prev: point-in-time 上年 TTM 分红矩阵，替换 prev_year_div_per_share。
     """
-    target_path = _store.RANKING_CSV.format(period=period)
+    if pit_ttm is not None:
+        target_path = os.path.join(_store.CSV_DIR, f"hk_ranking_pit_{period}.csv")
+    else:
+        target_path = _store.RANKING_CSV.format(period=period)
     if skip_existing and os.path.exists(target_path):
         logger.info(f"  {period} 已存在，跳过（--overwrite 覆盖）")
         return False
@@ -93,6 +103,16 @@ def backfill_one_month(period: str, stock_list: pd.DataFrame,
 
     fin = financial_df.copy()
     fin["code"] = fin["code"].astype(str).str.zfill(5)
+
+    # PIT: 用 point-in-time TTM 分红替换当前快照（根治前视偏差）
+    if pit_ttm is not None and period in pit_ttm.columns:
+        ttm = pit_ttm[period]
+        fin["fy_div_per_share"] = fin["code"].map(ttm).fillna(0.0)
+        if pit_prev is not None and period in pit_prev.columns:
+            prev = pit_prev[period]
+            fin["prev_year_div_per_share"] = fin["code"].map(prev).fillna(0.0)
+        logger.debug(f"  {period} 已应用 point-in-time 分红（时点 TTM 替换快照）")
+
     # 替换 current_price 为该月月底价（缺失则保留原值，避免误删）
     new_price = fin["code"].map(month_prices)
     coverage = new_price.notna().sum() / max(len(fin), 1)
@@ -153,8 +173,14 @@ def backfill_one_month(period: str, stock_list: pd.DataFrame,
         logger.warning(f"  {period} 排序结果为空，跳过")
         return False
 
-    save_ranking(ranked, period)
-    logger.info(f"  {period} ✓ 生成 {len(ranked)} 行（池 {len(pool_codes)}, 价格覆盖 {coverage:.0%}）")
+    if pit_ttm is not None:
+        # PIT 模式：写独立文件（hk_ranking_pit_{period}.csv），便于与旧回填对比评测
+        pit_path = os.path.join(_store.CSV_DIR, f"hk_ranking_pit_{period}.csv")
+        ranked.to_csv(pit_path, index=False, encoding="utf-8-sig")
+        logger.info(f"  {period} ✓ PIT 生成 {len(ranked)} 行 → {os.path.basename(pit_path)}")
+    else:
+        save_ranking(ranked, period)
+        logger.info(f"  {period} ✓ 生成 {len(ranked)} 行（池 {len(pool_codes)}, 价格覆盖 {coverage:.0%}）")
     return True
 
 
@@ -164,6 +190,9 @@ def main():
     parser.add_argument("--start", type=str, default=None, help="起始 YYYY-MM")
     parser.add_argument("--end", type=str, default=None, help="结束 YYYY-MM（默认今天的上月）")
     parser.add_argument("--overwrite", action="store_true", help="覆盖已存在的 ranking 文件")
+    parser.add_argument("--pit", action="store_true",
+                        help="point-in-time 模式：用时点 TTM 分红替换当前快照 fy_div_per_share，"
+                             "根治前视偏差，输出 hk_ranking_pit_{period}.csv")
     args = parser.parse_args()
 
     logger.info("===== 历史 ranking 回填开始 =====")
@@ -183,6 +212,19 @@ def main():
     industry_df = load_industry_data()
 
     price_wide = get_month_end_prices(price_df)
+
+    # PIT: 构建 point-in-time 分红矩阵（时点 TTM / 上年 TTM）
+    pit_ttm = pit_prev = None
+    if args.pit:
+        hist = load_dividend_history()
+        if hist.empty:
+            logger.error("分红历史为空，请先采集 point-in-time 数据（backtest.point_in_time）")
+            return
+        all_months = list_available_months(price_wide)
+        month_ends = [pd.Timestamp(m + "-01") + pd.offsets.MonthEnd(0) for m in all_months]
+        pit_ttm = ttm_dividend_matrix(hist, month_ends, months=12)
+        pit_prev = ttm_dividend_matrix(hist, month_ends, months=24) - pit_ttm
+        logger.info(f"point-in-time 分红矩阵已构建：{len(pit_ttm.index)} 只 × {len(pit_ttm.columns)} 期")
 
     # 起止月份计算
     end = args.end
@@ -204,6 +246,8 @@ def main():
             m, stock_list, financial_df, price_wide,
             skip_existing=not args.overwrite,
             industry_df=industry_df,
+            pit_ttm=pit_ttm,
+            pit_prev=pit_prev,
         ):
             generated += 1
 

@@ -37,3 +37,6 @@ data/csv/*.bak*
 data/csv/*.broken*
 data/csv/*.20*
 
+
+# PIT 回填派生数据（可 --pit 重建）
+data/csv/hk_ranking_pit_*.csv

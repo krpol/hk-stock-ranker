@@ -163,6 +163,25 @@ def ttm_dividend_as_of(code: str, as_of: pd.Timestamp, months: int = 12,
     return float(win["div_per_share"].sum()) if len(win) else 0.0
 
 
+def ttm_dividend_matrix(div_history: pd.DataFrame, as_of_dates: Iterable[pd.Timestamp],
+                        months: int = 12) -> pd.DataFrame:
+    """批量：返回 index=code、columns=时点 的 TTM 分红矩阵（向量化）。
+
+    对每个时点 t，计算「除息日 ∈ (t-months, t]」的分红按股票求和。
+    缺失的股票填 0（该时点无分红）。供 backfill 一次性重建多期排名。
+    """
+    hist = div_history.copy()
+    hist["ex_date"] = pd.to_datetime(hist["ex_date"])
+    out = {}
+    for t in as_of_dates:
+        t = pd.Timestamp(t)
+        start = t - pd.DateOffset(months=months)
+        win = hist[(hist["ex_date"] <= t) & (hist["ex_date"] > start)]
+        out[t.strftime("%Y-%m")] = win.groupby("code")["div_per_share"].sum()
+    mat = pd.DataFrame(out)
+    return mat.fillna(0.0)
+
+
 def dividend_as_of_series(code: str, as_of_dates: Iterable[pd.Timestamp],
                           months: int = 12,
                           div_history: Optional[pd.DataFrame] = None) -> pd.Series:
