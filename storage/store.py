@@ -3,6 +3,7 @@
 """
 import os
 import logging
+import re
 from datetime import datetime
 
 import pandas as pd
@@ -345,14 +346,23 @@ def load_ranking(period: str) -> pd.DataFrame:
     return pd.read_csv(csv_path, dtype={"code": str})
 
 
-def list_ranking_periods() -> list:
-    """列出所有已保存的排序期间"""
+def list_ranking_periods(tag: str = None) -> list:
+    """列出已保存的排序期间。
+
+    Args:
+        tag: 排名标签（如 "pit" / "ann" / "sus" / "ann_sus"）。默认 None 只匹配
+             旧口径 `hk_ranking_{YYYY-MM}.csv`；传入 tag 匹配 `hk_ranking_{tag}_{YYYY-MM}.csv`。
+             用正则校验 period 为 YYYY-MM，避免把带标签的文件名误解析成期间。
+    """
     if not os.path.exists(CSV_DIR):
         return []
+    prefix = f"hk_ranking_{tag}_" if tag else "hk_ranking_"
     periods = []
     for f in os.listdir(CSV_DIR):
-        if f.startswith("hk_ranking_") and f.endswith(".csv") and not f.endswith("_zh.csv"):
-            period = f.replace("hk_ranking_", "").replace(".csv", "")
+        if not f.startswith(prefix) or not f.endswith(".csv") or f.endswith("_zh.csv"):
+            continue
+        period = f[len(prefix):-4]
+        if re.fullmatch(r"\d{4}-\d{2}", period):
             periods.append(period)
     return sorted(periods, reverse=True)
 

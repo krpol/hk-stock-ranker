@@ -110,8 +110,8 @@ def _next_period(period: str) -> str:
     return ts.strftime("%Y-%m")
 
 
-def _list_periods_in_range(start: str, end: str) -> list[str]:
-    avail = _store.list_ranking_periods()
+def _list_periods_in_range(start: str, end: str, tag: str = None) -> list[str]:
+    avail = _store.list_ranking_periods(tag=tag)
     return sorted([p for p in avail if start <= p <= end])
 
 
@@ -120,7 +120,8 @@ def run_backtest(start: str, end: str,
                   weight_scheme: str = "equal",
                   transaction_cost_bps: int = BACKTEST_TRANSACTION_COST_BPS,
                   price_wide: Optional[pd.DataFrame] = None,
-                  strategy_name: str = "top_n") -> dict:
+                  strategy_name: str = "top_n",
+                  ranking_tag: Optional[str] = None) -> dict:
     """
     主策略 TOP N 回测。
 
@@ -135,6 +136,7 @@ def run_backtest(start: str, end: str,
         transaction_cost_bps: 单边交易成本（基点）
         price_wide: 月底价宽表，None 时自动加载
         strategy_name: 策略名（用于报告）
+        ranking_tag: 排名标签（如 "ann_sus"），None 读旧口径 hk_ranking_{period}.csv
 
     Returns:
         dict: {strategy, params, trace_df, nav, monthly_returns}
@@ -145,7 +147,7 @@ def run_backtest(start: str, end: str,
         raise RuntimeError("无月度价格数据，请先运行 --backfill-prices")
 
     # 区间内所有信号期（升序），每期作为下个月持仓的信号
-    periods = _list_periods_in_range(start, end)
+    periods = _list_periods_in_range(start, end, tag=ranking_tag)
     if len(periods) == 0:
         raise RuntimeError(
             f"区间 {start}~{end} 无 ranking 数据。请先运行 scripts/backfill_rankings.py 回填历史。"
@@ -162,7 +164,7 @@ def run_backtest(start: str, end: str,
         if hold_period > end:
             continue
 
-        cur_holdings = build_top_n(signal_period, top_n=top_n, weight_scheme=weight_scheme)
+        cur_holdings = build_top_n(signal_period, top_n=top_n, weight_scheme=weight_scheme, tag=ranking_tag)
         if cur_holdings.empty:
             logger.warning(f"信号期 {signal_period} 无持仓，跳过")
             continue
@@ -207,16 +209,20 @@ def run_quintile_backtest(start: str, end: str,
                            n_quantiles: int = 5,
                            weight_scheme: str = "equal",
                            transaction_cost_bps: int = BACKTEST_TRANSACTION_COST_BPS,
-                           price_wide: Optional[pd.DataFrame] = None) -> dict:
+                           price_wide: Optional[pd.DataFrame] = None,
+                           ranking_tag: Optional[str] = None) -> dict:
     """
     五分位回测：对每个分位独立跑全周期，返回 dict[label -> result]
+
+    Args:
+        ranking_tag: 排名标签（如 "ann_sus"），None 读旧口径。
     """
     if price_wide is None:
         price_wide = build_month_end_price()
     if price_wide.empty:
         raise RuntimeError("无月度价格数据")
 
-    periods = _list_periods_in_range(start, end)
+    periods = _list_periods_in_range(start, end, tag=ranking_tag)
     if len(periods) == 0:
         raise RuntimeError(f"区间 {start}~{end} 无 ranking 数据")
 
@@ -230,7 +236,7 @@ def run_quintile_backtest(start: str, end: str,
         if hold_period > end:
             continue
 
-        groups = build_quintiles(signal_period, n_quantiles=n_quantiles, weight_scheme=weight_scheme)
+        groups = build_quintiles(signal_period, n_quantiles=n_quantiles, weight_scheme=weight_scheme, tag=ranking_tag)
         for label, holdings in groups.items():
             st = state.setdefault(label, {"nav": 1.0, "prev": None, "rows": []})
             turnover = _turnover(st["prev"], holdings)

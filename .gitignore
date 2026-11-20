@@ -40,3 +40,6 @@ data/csv/*.20*
 
 # PIT 回填派生数据（可 --pit 重建）
 data/csv/hk_ranking_pit_*.csv
+data/csv/hk_ranking_ann_*.csv
+data/csv/hk_ranking_sus_*.csv
+data/csv/hk_ranking_ann_sus_*.csv

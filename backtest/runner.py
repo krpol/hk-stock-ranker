@@ -60,17 +60,22 @@ def run_topn_with_report(
     transaction_cost_bps: float = 15,
     with_benchmark: bool = True,
     report_name: Optional[str] = None,
+    ranking_tag: Optional[str] = None,
 ) -> dict:
     """
     跑 TOP-N 月度调仓回测，输出指标 + 净值曲线 + trace。
     报告保存到 data/reports/{name}.json + .trace.csv
+
+    Args:
+        ranking_tag: 排名标签（如 "ann_sus"），None 读旧口径。
     """
     _ensure_report_dir()
     name = report_name or f"backtest_top{top_n}_{start}_{end}_{weight_scheme}"
 
     result = run_backtest(start, end, top_n=top_n,
                            weight_scheme=weight_scheme,
-                           transaction_cost_bps=transaction_cost_bps)
+                           transaction_cost_bps=transaction_cost_bps,
+                           ranking_tag=ranking_tag)
     rets = result["monthly_returns"]
     nav = result["nav"]
     trace = result["trace"]
@@ -127,9 +132,13 @@ def run_quintile_with_report(
     weight_scheme: str = "equal",
     transaction_cost_bps: float = 15,
     report_name: Optional[str] = None,
+    ranking_tag: Optional[str] = None,
 ) -> dict:
     """
     跑五分位回测，输出每个分位的指标和单调性 Spearman。
+
+    Args:
+        ranking_tag: 排名标签（如 "ann_sus"），None 读旧口径。
     """
     _ensure_report_dir()
     name = report_name or f"quintile_q{n_quantiles}_{start}_{end}_{weight_scheme}"
@@ -137,7 +146,8 @@ def run_quintile_with_report(
     result = run_quintile_backtest(start, end,
                                      n_quantiles=n_quantiles,
                                      weight_scheme=weight_scheme,
-                                     transaction_cost_bps=transaction_cost_bps)
+                                     transaction_cost_bps=transaction_cost_bps,
+                                     ranking_tag=ranking_tag)
     quintiles = result["quintiles"]
 
     quintile_summaries = {}

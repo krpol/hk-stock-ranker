@@ -239,13 +239,18 @@ def rank_stocks(
             merged[col] = 0.0
         merged[col] = merged[col].fillna(0.0)
 
-    # 市值过滤
-    if min_market_cap and "market_cap" in merged.columns:
+    # 流动性过滤：优先 amount（当日成交额），fallback market_cap。
+    # Step 4（2026-11-20）：新版 akshare 的 market_cap 字段实际存的是成交额（与 amount
+    # 完全一致），故显式用 amount 更清晰；阈值见 settings.min_market_cap（默认 100 万港元）。
+    liq_col = "amount" if "amount" in merged.columns else (
+        "market_cap" if "market_cap" in merged.columns else None)
+    if min_market_cap and liq_col:
         before_count = len(merged)
-        merged = merged[merged["market_cap"].fillna(0) >= min_market_cap]
+        merged = merged[pd.to_numeric(merged[liq_col], errors="coerce").fillna(0) >= min_market_cap]
         after_count = len(merged)
         if before_count > after_count:
-            logger.info(f"市值过滤：过滤掉 {before_count - after_count} 只股票")
+            logger.info(f"流动性过滤（{liq_col}）：过滤掉 {before_count - after_count} 只股票"
+                        f"（阈值 {min_market_cap:,.0f} 港元）")
 
     # 过滤无分红历史的股票
     if require_dividend_history and "has_dividend_history" in merged.columns:

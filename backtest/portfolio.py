@@ -56,8 +56,13 @@ def _filter_by_pool(df: pd.DataFrame, signal_period: str) -> pd.DataFrame:
     return df[df["code"].isin(pool_codes)].reset_index(drop=True)
 
 
-def load_ranking_period(period: str) -> pd.DataFrame:
-    path = _store.RANKING_CSV.format(period=period)
+def load_ranking_period(period: str, tag: str = None) -> pd.DataFrame:
+    """加载某期排名。tag=None 读旧口径 `hk_ranking_{period}.csv`；
+    tag="ann_sus" 读 `hk_ranking_ann_sus_{period}.csv`（干净口径）。"""
+    if tag:
+        path = os.path.join(_store.CSV_DIR, f"hk_ranking_{tag}_{period}.csv")
+    else:
+        path = _store.RANKING_CSV.format(period=period)
     if not os.path.exists(path):
         return pd.DataFrame()
     df = pd.read_csv(path, dtype={"code": str})
@@ -111,14 +116,18 @@ def _assign_weights(df: pd.DataFrame, scheme: str) -> pd.DataFrame:
 
 
 def build_top_n(period: str, top_n: int = 20, weight_scheme: str = "equal",
-                min_composite_score: Optional[float] = None) -> pd.DataFrame:
+                min_composite_score: Optional[float] = None,
+                tag: str = None) -> pd.DataFrame:
     """
     按 composite_score 降序取 TOP N（已在 ranking 中按 rank 排好）。
+
+    Args:
+        tag: 排名标签（如 "ann_sus"），默认 None 读旧口径。
 
     Returns:
         DataFrame[code, name, composite_score, rank, weight]
     """
-    df = load_ranking_period(period)
+    df = load_ranking_period(period, tag=tag)
     if df.empty:
         return pd.DataFrame(columns=["code", "name", "composite_score", "rank", "weight"])
 
@@ -137,12 +146,16 @@ def build_top_n(period: str, top_n: int = 20, weight_scheme: str = "equal",
 
 
 def build_quintiles(period: str, n_quantiles: int = 5,
-                     weight_scheme: str = "equal") -> dict:
+                     weight_scheme: str = "equal",
+                     tag: str = None) -> dict:
     """
     按 composite_score 五分位（默认）。返回 dict[label -> DataFrame]。
     Q1 = 最高分组，Q5 = 最低分组（与学界惯例对齐）。
+
+    Args:
+        tag: 排名标签（如 "ann_sus"），默认 None 读旧口径。
     """
-    df = load_ranking_period(period)
+    df = load_ranking_period(period, tag=tag)
     if df.empty or len(df) < n_quantiles:
         return {}
 
